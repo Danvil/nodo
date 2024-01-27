@@ -1,0 +1,12 @@
+# Copyright 2024 by David Weikersdorfer
+[workspace]
+resolver = "2"
+members = [
+  "nodo",
+  "nodo_async",
+  "nodo_core",
+  "nodo_derive",
+  "nodo_json",
+  "nodo_record",
+  "nodo_std",
+]
