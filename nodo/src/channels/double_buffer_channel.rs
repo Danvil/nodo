@@ -10,6 +10,7 @@ use crate::channels::RxChannelTimeseries;
 use crate::channels::StrictlyIncreasingLinear;
 use crate::channels::TxBundle;
 use crate::channels::{Rx, Tx};
+use crate::prelude::RetentionPolicy;
 use core::num::NonZeroU64;
 use core::ops;
 use nodo_core::Message;
@@ -24,7 +25,7 @@ pub fn fixed_channel<T: Clone + Send + Sync>(
     size: usize,
 ) -> (DoubleBufferTx<T>, DoubleBufferRx<T>) {
     let mut tx = DoubleBufferTx::new(size);
-    let mut rx = DoubleBufferRx::new(size, OverflowPolicy::Reject);
+    let mut rx = DoubleBufferRx::new(OverflowPolicy::Reject(size), RetentionPolicy::Keep);
     tx.connect(&mut rx).unwrap();
     (tx, rx)
 }
@@ -65,7 +66,7 @@ impl<T> DoubleBufferTx<T> {
     /// TODO rename to `new_fixed`
     pub fn new(capacity: usize) -> Self {
         Self {
-            outbox: BackStage::new(capacity, OverflowPolicy::Reject),
+            outbox: BackStage::new(OverflowPolicy::Reject(capacity), RetentionPolicy::Drop),
             connections: Vec::new(),
         }
     }
@@ -77,8 +78,8 @@ impl<T> DoubleBufferTx<T> {
     pub fn new_auto_size() -> Self {
         Self {
             outbox: BackStage::new(
-                1,
                 OverflowPolicy::Resize(StrictlyIncreasingLinear::from_factor(2)),
+                RetentionPolicy::Drop,
             ),
             connections: Vec::new(),
         }
@@ -118,7 +119,7 @@ impl<T> DoubleBufferTx<T> {
         if matches!(self.outbox.overflow_policy(), OverflowPolicy::Resize(_))
             && matches!(
                 rx.back.read().unwrap().overflow_policy(),
-                OverflowPolicy::Reject
+                OverflowPolicy::Reject(_)
             )
         {
             return Err(TxConnectError::PolicyMismatch);
@@ -250,9 +251,11 @@ impl FlushResult {
 impl<T> DoubleBufferRx<T> {
     /// Creates a new RX channel
     /// TODO deprecate in favor of `new_auto_size`, `new_fixed`, and `new_forget`
-    pub fn new(capacity: usize, policy: OverflowPolicy) -> Self {
+    pub fn new(overflow_policy: OverflowPolicy, retention_policy: RetentionPolicy) -> Self {
+        let back = BackStage::new(overflow_policy, retention_policy);
+        let capacity = back.capacity();
         Self {
-            back: Arc::new(RwLock::new(BackStage::new(capacity, policy))),
+            back: Arc::new(RwLock::new(back)),
             front: FrontStage::new(capacity),
             is_connected: false,
         }
@@ -260,7 +263,7 @@ impl<T> DoubleBufferRx<T> {
 
     /// Creates a channel which stores the most recent message
     pub fn new_latest() -> Self {
-        Self::new(1, OverflowPolicy::Forget)
+        Self::new(OverflowPolicy::Forget(1), RetentionPolicy::Keep)
     }
 
     /// Creates a channel which automatically resizes itself to always succeed in receiving
@@ -269,8 +272,8 @@ impl<T> DoubleBufferRx<T> {
     /// better to use a fixed capacity or to forget old messages.
     pub fn new_auto_size() -> Self {
         Self::new(
-            1,
             OverflowPolicy::Resize(StrictlyIncreasingLinear::from_factor(2)),
+            RetentionPolicy::Drop,
         )
     }
 

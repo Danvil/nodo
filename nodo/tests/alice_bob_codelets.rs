@@ -1,17 +1,9 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use nodo::channels::DoubleBufferRx;
-use nodo::channels::DoubleBufferTx;
-use nodo::channels::OverflowPolicy;
-use nodo::codelet::Codelet;
-use nodo::codelet::Context;
-use nodo::codelet::IntoInstance;
 use nodo::codelet::ScheduleBuilder;
 use nodo::codelet::ScheduleExecutor;
+use nodo::prelude::*;
 use nodo::runtime::Runtime;
-use nodo_core::{Outcome, SUCCESS};
-use nodo_derive::RxBundleDerive;
-use nodo_derive::TxBundleDerive;
 use std::time::Duration;
 
 mod common;
@@ -73,7 +65,7 @@ impl Codelet for Bob {
     fn build_bundles(_: &Self::Config) -> (Self::Rx, Self::Tx) {
         (
             BobRx {
-                ping: DoubleBufferRx::new(1, OverflowPolicy::Reject),
+                ping: DoubleBufferRx::new(OverflowPolicy::Reject(1), RetentionPolicy::Drop),
             },
             (),
         )

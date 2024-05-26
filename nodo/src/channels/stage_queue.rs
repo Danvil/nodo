@@ -13,23 +13,39 @@ pub struct FrontStage<T> {
 /// The back stage of StageQueue
 pub struct BackStage<T> {
     items: VecDeque<T>,
-    capacity: usize,
     overflow_policy: OverflowPolicy,
+    retention_policy: RetentionPolicy,
 }
 
 /// Push policy in case the back stage is at capacity when an item is pushed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OverflowPolicy {
     /// An error code is returned and the item is not added to the queue.
-    Reject,
+    Reject(usize),
 
     /// The oldest item is removed to make room for the new item.
-    Forget,
+    Forget(usize),
 
     /// Queue capacity is increased to fit the new item.
     Resize(StrictlyIncreasingLinear),
 }
 
+/// Describes how leftover items in the front queue are handled when a new frame begins.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetentionPolicy {
+    /// Keeps leftover items. This policy can only be used if the overflow policy is Forget or
+    /// Resize.
+    Keep,
+
+    /// Removes leftover items from the queue.
+    Drop,
+
+    /// The dev must drain all items out of the queue before the frame ends.
+    EnforceEmpty,
+}
+
 /// A strictly increasing linear function of the form `f(x) = a*x + b`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StrictlyIncreasingLinear {
     addend: usize,
     factor: usize,
@@ -86,11 +102,22 @@ impl<T> ops::IndexMut<usize> for FrontStage<T> {
 }
 
 impl<T> BackStage<T> {
-    pub fn new(capacity: usize, overflow_policy: OverflowPolicy) -> Self {
+    pub fn new(overflow_policy: OverflowPolicy, retention_policy: RetentionPolicy) -> Self {
+        assert!(
+            retention_policy != RetentionPolicy::Keep
+                || !matches!(overflow_policy, OverflowPolicy::Reject(_)),
+            "Retention policy 'Keep' not allowed with overflow policy 'Reject'"
+        );
+
+        let items = match overflow_policy {
+            OverflowPolicy::Reject(n) | OverflowPolicy::Forget(n) => VecDeque::with_capacity(n),
+            OverflowPolicy::Resize(_) => VecDeque::new(),
+        };
+
         Self {
-            items: VecDeque::with_capacity(capacity),
-            capacity,
+            items,
             overflow_policy,
+            retention_policy,
         }
     }
 
@@ -99,24 +126,28 @@ impl<T> BackStage<T> {
     }
 
     pub fn capacity(&self) -> usize {
-        self.capacity
+        self.items.capacity()
     }
 
     pub fn len(&self) -> usize {
         self.items.len()
     }
 
-    pub fn push(&mut self, value: T) -> Result<(), T> {
-        if self.items.len() == self.capacity {
-            match &self.overflow_policy {
-                OverflowPolicy::Reject => return Err(value),
-                OverflowPolicy::Forget => {
+    pub fn push(&mut self, value: T) -> Result<(), PushError> {
+        match self.overflow_policy {
+            OverflowPolicy::Reject(n) => {
+                if self.items.len() == n {
+                    return Err(PushError::Rejected);
+                }
+            }
+            OverflowPolicy::Forget(n) => {
+                if self.items.len() == n {
                     self.items.pop_front();
                 }
-                OverflowPolicy::Resize(sil) => {
-                    self.capacity = sil.eval(self.capacity);
-                    self.items.reserve_exact(self.capacity);
-                }
+            }
+            OverflowPolicy::Resize(sil) => {
+                let capacity = sil.eval(self.capacity());
+                self.items.reserve_exact(capacity);
             }
         }
         self.items.push_back(value);
@@ -124,16 +155,55 @@ impl<T> BackStage<T> {
     }
 
     /// Clears the front stage and moves all items from the backstage to the front stage
-    pub fn sync(&mut self, other: &mut FrontStage<T>) {
-        other.items.clear();
+    pub fn sync(&mut self, target: &mut FrontStage<T>) -> Result<(), SyncError> {
+        match self.retention_policy {
+            RetentionPolicy::Keep => {
+                match self.overflow_policy {
+                    OverflowPolicy::Forget(n) => {
+                        let incoming_count = self.items.len();
+                        assert!(incoming_count <= n);
+                        let current_count = target.items.len();
+                        assert!(current_count <= n);
 
-        if matches!(self.overflow_policy, OverflowPolicy::Resize { .. }) {
-            other.items.reserve_exact(self.capacity());
-        } else {
-            assert_eq!(other.capacity(), self.capacity());
-        };
+                        let available_count = n - target.len();
+                        if available_count < incoming_count {
+                            let delta = incoming_count - available_count;
+                            target.drain(0..delta);
+                        }
 
-        std::mem::swap(&mut self.items, &mut other.items);
+                        target.items.append(&mut self.items);
+
+                        assert_eq!(target.items.len(), (current_count + incoming_count).min(n));
+                        assert_eq!(target.items.capacity(), n);
+                        assert_eq!(self.items.len(), 0);
+                        assert_eq!(self.items.capacity(), n);
+
+                        Ok(())
+                    }
+                    OverflowPolicy::Reject(_) => {
+                        // SAFETY: This is checked in the constructor.
+                        unreachable!();
+                    }
+                    OverflowPolicy::Resize(_) => {
+                        // TODO use SIL
+                        self.items.append(&mut target.items);
+                        Ok(())
+                    }
+                }
+            }
+            RetentionPolicy::Drop => {
+                target.items.clear();
+                std::mem::swap(&mut self.items, &mut target.items);
+                Ok(())
+            }
+            RetentionPolicy::EnforceEmpty => {
+                if !target.items.is_empty() {
+                    return Err(SyncError::NotEmpty);
+                }
+                std::mem::swap(&mut self.items, &mut target.items);
+                Ok(())
+            }
+        }
     }
 
     pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, T> {
@@ -147,6 +217,16 @@ impl<T> BackStage<T> {
     pub fn clear(&mut self) {
         self.items.clear()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PushError {
+    Rejected,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncError {
+    NotEmpty,
 }
 
 impl StrictlyIncreasingLinear {
@@ -192,10 +272,12 @@ impl StrictlyIncreasingLinear {
 
 #[cfg(test)]
 mod tests {
-    use crate::channels::stage_queue::OverflowPolicy;
-    use crate::channels::stage_queue::StrictlyIncreasingLinear;
     use crate::channels::BackStage;
     use crate::channels::FrontStage;
+    use crate::channels::PushError;
+    use crate::channels::StrictlyIncreasingLinear;
+    use crate::channels::SyncError;
+    use crate::prelude::*;
 
     pub struct StageQueue<T> {
         back: BackStage<T>,
@@ -205,21 +287,21 @@ mod tests {
     impl<T> StageQueue<T> {
         pub fn new(capacity: usize, policy: OverflowPolicy) -> StageQueue<T> {
             StageQueue {
-                back: BackStage::new(capacity, policy),
+                back: BackStage::new(policy, RetentionPolicy::Drop),
                 front: FrontStage::new(capacity),
             }
         }
 
         pub fn capacity(&self) -> usize {
-            self.back.capacity()
+            self.back.items.capacity()
         }
 
-        pub fn push(&mut self, value: T) -> Result<(), T> {
+        pub fn push(&mut self, value: T) -> Result<(), PushError> {
             self.back.push(value)
         }
 
-        pub fn sync(&mut self) {
-            self.back.sync(&mut self.front);
+        pub fn sync(&mut self) -> Result<(), SyncError> {
+            self.back.sync(&mut self.front)
         }
 
         pub fn len(&mut self) -> usize {
@@ -248,7 +330,7 @@ mod tests {
         assert_eq!(sq.capacity(), 2);
 
         assert_eq!(sq.pop(), None);
-        sq.sync();
+        sq.sync().unwrap();
         assert_eq!(sq.pop(), Some(31));
         assert_eq!(sq.pop(), Some(42));
 
@@ -262,15 +344,15 @@ mod tests {
 
     #[test]
     fn test_push_reject() {
-        let mut sq = StageQueue::new(1, OverflowPolicy::Reject);
+        let mut sq = StageQueue::new(1, OverflowPolicy::Reject(1));
         assert_eq!(sq.capacity(), 1);
 
         assert_eq!(sq.push(31), Ok(()));
-        assert_eq!(sq.push(42), Err(42));
+        assert_eq!(sq.push(42), Err(PushError::Rejected));
         assert_eq!(sq.capacity(), 1);
 
         assert_eq!(sq.pop(), None);
-        sq.sync();
+        sq.sync().unwrap();
         assert_eq!(sq.pop(), Some(31));
         assert_eq!(sq.pop(), None);
 
@@ -280,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_push_forget() {
-        let mut sq = StageQueue::new(1, OverflowPolicy::Forget);
+        let mut sq = StageQueue::new(1, OverflowPolicy::Forget(1));
         assert_eq!(sq.capacity(), 1);
 
         assert_eq!(sq.push(31), Ok(()));
@@ -288,7 +370,7 @@ mod tests {
         assert_eq!(sq.capacity(), 1);
 
         assert_eq!(sq.pop(), None);
-        sq.sync();
+        sq.sync().unwrap();
         assert_eq!(sq.pop(), Some(42));
         assert_eq!(sq.pop(), None);
 

@@ -12,6 +12,7 @@ pub mod prelude {
     pub use crate::channels::DoubleBufferTx;
     pub use crate::channels::OverflowPolicy;
     pub use crate::channels::Pop;
+    pub use crate::channels::RetentionPolicy;
     pub use crate::channels::Rx;
     pub use crate::channels::Timeseries;
     pub use crate::channels::Tx;
@@ -25,6 +26,7 @@ pub mod prelude {
     pub use nodo_core::Pubtime;
     pub use nodo_core::Stamp;
     pub use nodo_core::WithAcqtime;
+    pub use nodo_core::SUCCESS;
     pub use nodo_derive::RxBundleDerive;
     pub use nodo_derive::TxBundleDerive;
 }
