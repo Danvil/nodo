@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use core::ops;
 use core::time::Duration;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy)]
 pub struct Timestamp<M>(Duration, PhantomData<M>);
 
 impl<M> Timestamp<M> {
@@ -18,6 +18,26 @@ impl<M> Timestamp<M> {
         } else {
             other.0.checked_sub(self.0).unwrap()
         }
+    }
+}
+
+impl<T> PartialEq for Timestamp<T> {
+    fn eq(&self, other: &Timestamp<T>) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<T> Eq for Timestamp<T> {}
+
+impl<T> PartialOrd for Timestamp<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<T> Ord for Timestamp<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
     }
 }
 

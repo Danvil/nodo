@@ -71,6 +71,20 @@ impl<T> FrontStage<T> {
     }
 }
 
+impl<T> ops::Index<usize> for FrontStage<T> {
+    type Output = T;
+
+    fn index(&self, idx: usize) -> &Self::Output {
+        &self.items[idx]
+    }
+}
+
+impl<T> ops::IndexMut<usize> for FrontStage<T> {
+    fn index_mut(&mut self, idx: usize) -> &mut Self::Output {
+        &mut self.items[idx]
+    }
+}
+
 impl<T> BackStage<T> {
     pub fn new(capacity: usize, overflow_policy: OverflowPolicy) -> Self {
         Self {

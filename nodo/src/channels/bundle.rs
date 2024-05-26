@@ -29,7 +29,7 @@ pub trait RxBundle: Send {
     fn name(&self, index: usize) -> String;
 
     /// Synchronizes all endpoints
-    fn sync(&mut self);
+    fn sync_all(&mut self);
 
     /// Connection status of all endpoints in the budle
     fn check_connection(&self) -> ConnectionCheck;
@@ -42,7 +42,7 @@ pub trait TxBundle: Send {
     fn name(&self, index: usize) -> String;
 
     /// Flushes all endpoints
-    fn flush(&mut self) -> Result<(), MultiFlushError>;
+    fn flush_all(&mut self) -> Result<(), MultiFlushError>;
 
     /// Connection status of all endpoints in the budle
     fn check_connection(&self) -> ConnectionCheck;
@@ -68,7 +68,7 @@ impl RxBundle for () {
         panic!("empty bundle")
     }
 
-    fn sync(&mut self) {}
+    fn sync_all(&mut self) {}
 
     fn check_connection(&self) -> ConnectionCheck {
         ConnectionCheck::default()
@@ -84,7 +84,7 @@ macro_rules! impl_rx_bundle_tuple {
                 format!("{index}")
             }
 
-            fn sync(&mut self) {
+            fn sync_all(&mut self) {
                 $(paste!{self.$i}.sync();)*
             }
 
@@ -112,7 +112,7 @@ impl TxBundle for () {
         panic!("empty bundle")
     }
 
-    fn flush(&mut self) -> Result<(), MultiFlushError> {
+    fn flush_all(&mut self) -> Result<(), MultiFlushError> {
         Ok(())
     }
 
@@ -130,7 +130,7 @@ macro_rules! impl_tx_bundle_tuple {
                 format!("{index}")
             }
 
-            fn flush(&mut self) -> Result<(), MultiFlushError> {
+            fn flush_all(&mut self) -> Result<(), MultiFlushError> {
                 let errs: Vec<(usize, FlushError)> = [$(paste!{self.$i}.flush(),)*]
                     .into_iter()
                     .enumerate()

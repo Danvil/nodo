@@ -1,12 +1,19 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::channels::BackStage;
+use crate::channels::ConnectionCheck;
 use crate::channels::FrontStage;
+use crate::channels::MultiFlushError;
 use crate::channels::OverflowPolicy;
+use crate::channels::RxBundle;
+use crate::channels::RxChannelTimeseries;
 use crate::channels::StrictlyIncreasingLinear;
+use crate::channels::TxBundle;
 use crate::channels::{Rx, Tx};
 use core::num::NonZeroU64;
 use core::ops;
+use nodo_core::Message;
+use nodo_core::TimestampKind;
 use std::collections::vec_deque;
 use std::fmt;
 use std::sync::Arc;
@@ -139,6 +146,23 @@ pub enum TxConnectError {
     PolicyMismatch,
 }
 
+impl<T: Send + Sync + Clone> TxBundle for DoubleBufferTx<T> {
+    fn name(&self, index: usize) -> String {
+        assert_eq!(index, 0);
+        String::from("out")
+    }
+
+    fn flush_all(&mut self) -> Result<(), MultiFlushError> {
+        self.flush().map_err(|fe| MultiFlushError(vec![(0, fe)]))
+    }
+
+    fn check_connection(&self) -> ConnectionCheck {
+        let mut cc = ConnectionCheck::new(1);
+        cc.mark(0, self.is_connected());
+        cc
+    }
+}
+
 impl<T: Send + Sync + Clone> Tx for DoubleBufferTx<T> {
     fn flush(&mut self) -> Result<(), FlushError> {
         let mut result = FlushResult::new();
@@ -250,33 +274,8 @@ impl<T> DoubleBufferRx<T> {
         )
     }
 
-    /// Removes the next message from the inbox
-    pub fn pop(&mut self) -> Result<T, RxRecvError> {
-        match self.front.pop() {
-            Some(x) => Ok(x),
-            None => Err(RxRecvError::QueueEmtpy),
-        }
-    }
-
-    pub fn try_pop(&mut self) -> Option<T> {
-        self.pop().ok()
-    }
-
-    pub fn try_pop_update<'a, 'b>(&'a mut self, other: &'b mut Option<T>) -> &'b mut Option<T> {
-        match self.try_pop() {
-            Some(x) => *other = Some(x),
-            None => {}
-        }
-        other
-    }
-
     pub fn pop_all(&mut self) -> std::collections::vec_deque::Drain<'_, T> {
         self.front.drain(..)
-    }
-
-    /// Returns true if the inbox is empty.
-    pub fn is_empty(&self) -> bool {
-        self.front.len() == 0
     }
 
     /// Number of messages currently visible. Additional messages might be stored in the stage
@@ -297,6 +296,89 @@ impl<T> DoubleBufferRx<T> {
     }
 }
 
+impl<T> DoubleBufferRx<Message<T>> {
+    pub fn as_acq_time_series<'a>(&'a self) -> RxChannelTimeseries<'a, T> {
+        RxChannelTimeseries {
+            channel: self,
+            kind: TimestampKind::Acq,
+        }
+    }
+
+    pub fn as_pub_time_series<'a>(&'a self) -> RxChannelTimeseries<'a, T> {
+        RxChannelTimeseries {
+            channel: self,
+            kind: TimestampKind::Pub,
+        }
+    }
+}
+
+pub trait Pop {
+    type Output;
+
+    /// Returns true if the inbox is empty.
+    fn is_empty(&self) -> bool;
+
+    /// Removes the next message from the inbox
+    fn pop(&mut self) -> Result<Self::Output, RxRecvError>;
+
+    fn try_pop(&mut self) -> Option<Self::Output> {
+        self.pop().ok()
+    }
+
+    fn try_pop_update<'a, 'b>(
+        &'a mut self,
+        other: &'b mut Option<Self::Output>,
+    ) -> &'b mut Option<Self::Output> {
+        match self.try_pop() {
+            Some(x) => *other = Some(x),
+            None => {}
+        }
+        other
+    }
+}
+
+impl<T> Pop for DoubleBufferRx<T> {
+    type Output = T;
+
+    fn is_empty(&self) -> bool {
+        self.front.is_empty()
+    }
+
+    fn pop(&mut self) -> Result<T, RxRecvError> {
+        self.front.pop().ok_or(RxRecvError::QueueEmtpy)
+    }
+}
+
+impl<'a, T1: Pop, T2: Pop> Pop for (&'a mut T1, &'a mut T2) {
+    type Output = (<T1 as Pop>::Output, <T2 as Pop>::Output);
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty() || self.1.is_empty()
+    }
+
+    fn pop(&mut self) -> Result<Self::Output, RxRecvError> {
+        if self.is_empty() {
+            Err(RxRecvError::QueueEmtpy)
+        } else {
+            Ok((self.0.pop().unwrap(), self.1.pop().unwrap()))
+        }
+    }
+}
+
+impl<T> ops::Index<usize> for DoubleBufferRx<T> {
+    type Output = T;
+
+    fn index(&self, idx: usize) -> &Self::Output {
+        &self.front[idx]
+    }
+}
+
+impl<T> ops::IndexMut<usize> for DoubleBufferRx<T> {
+    fn index_mut(&mut self, idx: usize) -> &mut Self::Output {
+        &mut self.front[idx]
+    }
+}
+
 impl<T: Send + Sync> Rx for DoubleBufferRx<T> {
     fn is_connected(&self) -> bool {
         self.is_connected
@@ -304,6 +386,23 @@ impl<T: Send + Sync> Rx for DoubleBufferRx<T> {
 
     fn sync(&mut self) {
         self.back.write().unwrap().sync(&mut self.front);
+    }
+}
+
+impl<T: Send + Sync> RxBundle for DoubleBufferRx<T> {
+    fn name(&self, index: usize) -> String {
+        assert_eq!(index, 0);
+        String::from("in")
+    }
+
+    fn sync_all(&mut self) {
+        self.sync()
+    }
+
+    fn check_connection(&self) -> ConnectionCheck {
+        let mut cc = ConnectionCheck::new(1);
+        cc.mark(0, self.is_connected());
+        cc
     }
 }
 
@@ -340,8 +439,7 @@ impl std::error::Error for RxRecvError {}
 #[cfg(test)]
 mod tests {
     use crate::channels::double_buffer_channel::fixed_channel;
-    use crate::channels::Rx;
-    use crate::channels::Tx;
+    use crate::prelude::*;
     use std::sync::mpsc;
 
     #[test]

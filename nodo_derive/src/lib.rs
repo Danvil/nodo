@@ -43,7 +43,7 @@ fn impl_rx_bundle_derive(input: &syn::DeriveInput) -> TokenStream {
                 }
             }
 
-            fn sync(&mut self) {
+            fn sync_all(&mut self) {
                 use nodo::channels::Rx;
 
                 #(self.#field_name.sync();)*
@@ -98,7 +98,7 @@ fn impl_tx_bundle_derive(input: &syn::DeriveInput) -> TokenStream {
                 }
             }
 
-            fn flush(&mut self) -> Result<(), nodo::channels::MultiFlushError> {
+            fn flush_all(&mut self) -> Result<(), nodo::channels::MultiFlushError> {
                 use nodo::channels::Tx;
 
                 let mut errs = Vec::new();

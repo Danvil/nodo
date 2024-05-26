@@ -80,7 +80,7 @@ impl<C: Codelet> CodeletInstance<C> {
             );
         }
 
-        self.rx.sync();
+        self.rx.sync_all();
         self.clock.as_mut().unwrap().start();
         self.state.start(
             &Context {
@@ -90,13 +90,13 @@ impl<C: Codelet> CodeletInstance<C> {
             &mut self.rx,
             &mut self.tx,
         )?;
-        self.tx.flush()?;
+        self.tx.flush_all()?;
 
         SUCCESS
     }
 
     pub fn stop(&mut self) -> Outcome {
-        self.rx.sync();
+        self.rx.sync_all();
         self.state.stop(
             &Context {
                 clock: &self.clock.as_ref().unwrap(),
@@ -105,12 +105,12 @@ impl<C: Codelet> CodeletInstance<C> {
             &mut self.rx,
             &mut self.tx,
         )?;
-        self.tx.flush()?;
+        self.tx.flush_all()?;
         SUCCESS
     }
 
     pub fn step(&mut self) -> Outcome {
-        self.rx.sync();
+        self.rx.sync_all();
         self.clock.as_mut().unwrap().step();
         self.state.step(
             &Context {
@@ -120,7 +120,7 @@ impl<C: Codelet> CodeletInstance<C> {
             &mut self.rx,
             &mut self.tx,
         )?;
-        self.tx.flush()?;
+        self.tx.flush_all()?;
         SUCCESS
     }
 
