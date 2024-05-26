@@ -66,7 +66,7 @@ impl<T: Send + Sync> nodo::channels::RxBundle for JoinRx<T> {
         }
     }
 
-    fn sync(&mut self) {
+    fn sync_all(&mut self) {
         for channel in self.inputs.iter_mut() {
             channel.sync()
         }
@@ -93,7 +93,7 @@ impl<T: Send + Sync + Clone> nodo::channels::TxBundle for JoinTx<T> {
         "output".to_string()
     }
 
-    fn flush(&mut self) -> Result<(), nodo::channels::MultiFlushError> {
+    fn flush_all(&mut self) -> Result<(), nodo::channels::MultiFlushError> {
         self.output
             .flush()
             .map_err(|e| nodo::channels::MultiFlushError(vec![(0, e)]))

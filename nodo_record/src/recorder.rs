@@ -1,58 +1,59 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::{McapWriter, McapWriterConfig, Serializer};
+use crate::SchemaSet;
+use crate::{McapWriter, McapWriterConfig};
 use mcap::{Channel as McapChannel, Schema as McapSchema};
-use nodo::channels::DoubleBufferTx;
-use nodo::codelet::{
-    CodeletInstance, Instantiate, IntoInstance, Schedulable, ScheduleBuilder, Vise,
-};
-use nodo_core::SchemaDb;
-use nodo_core::{
-    eyre, EyreResult, ProtoSerializable, RecorderChannelId, SerializedMessage, WithAcqtime,
-};
+use nodo::codelet::{CodeletInstance, Schedulable, ScheduleBuilder, Vise};
+use nodo::prelude::*;
+use nodo_core::BinaryFormat;
+use nodo_core::{eyre, EyreResult, RecorderChannelId, SerializedMessage};
 use nodo_std::Join;
 use nodo_std::JoinConfig;
+use nodo_std::Serializer;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Faciliates recording of data channels
-pub struct Recorder {
+pub struct Recorder<BF> {
+    serializer: BF,
     rec: CodeletInstance<McapWriter<'static>>,
     join: CodeletInstance<Join<SerializedMessage>>,
     ser_vises: Vec<Vise>,
 }
 
-impl Recorder {
+impl<BF> Recorder<BF> {
     /// Create a new recorder which writes to an MCAP file
-    pub fn new(cfg: McapWriterConfig) -> EyreResult<Self> {
+    pub fn new(serializer: BF, cfg: McapWriterConfig) -> EyreResult<Self> {
         let mut join = Join::instantiate("rec-join", JoinConfig { input_count: 0 });
         let mut rec = McapWriter::from_config(&cfg)?.into_instance("rec-writer", cfg);
 
         join.tx.output.connect(&mut rec.rx.0)?;
 
         Ok(Self {
+            serializer,
             join,
             rec,
             ser_vises: Vec::new(),
         })
     }
 
-    pub fn schema_db_mut(&mut self) -> &mut SchemaDb {
+    pub fn schema_db_mut(&mut self) -> &mut SchemaSet {
         &mut self.rec.state.schema_db
     }
 
     /// Creates a codelet which serializes messages to protobuf and writes them to MCAP.
     #[must_use]
-    pub fn record<S, T>(&mut self, topic: S, tx: &mut DoubleBufferTx<T>) -> EyreResult<()>
+    pub fn record<S, T>(&mut self, topic: S, tx: &mut DoubleBufferTx<Message<T>>) -> EyreResult<()>
     where
+        BF: Clone + Send + BinaryFormat<T> + 'static,
         S: Into<String>,
-        T: Send + Sync + Clone + WithAcqtime + ProtoSerializable + 'static,
+        T: Clone + Send + Sync + 'static,
     {
         let topic = topic.into();
         let codelet_name = format!("rec-{}", topic);
 
-        let schema = T::schema();
+        let schema = self.serializer.schema();
 
         let schema_def = self
             .rec
@@ -81,10 +82,11 @@ impl Recorder {
                 .add_channel(&self.rec.state.channels.last().unwrap())?,
         );
 
-        let mut ser = Serializer::new(channel_id).into_instance(codelet_name, ());
+        let mut ser =
+            Serializer::new(channel_id, self.serializer.clone()).into_instance(codelet_name, ());
 
-        tx.connect(&mut ser.rx.0)?;
-        ser.tx.0.connect(&mut self.join.rx.new_channel_mut())?;
+        tx.connect(&mut ser.rx)?;
+        ser.tx.connect(&mut self.join.rx.new_channel_mut())?;
 
         self.ser_vises.push(ser.into());
 
@@ -92,7 +94,7 @@ impl Recorder {
     }
 }
 
-impl Schedulable for Recorder {
+impl<BF> Schedulable for Recorder<BF> {
     fn schedule(self, sched: &mut ScheduleBuilder) {
         self.ser_vises.schedule(sched);
         self.join.schedule(sched);

@@ -3,6 +3,7 @@
 use core::marker::PhantomData;
 use nodo::channels::DoubleBufferRx;
 use nodo::channels::DoubleBufferTx;
+use nodo::channels::Pop;
 use nodo::channels::{Rx, Tx};
 use nodo::codelet::Codelet;
 use nodo::codelet::Context;
@@ -81,7 +82,7 @@ impl<T: Send + Sync> nodo::channels::RxBundle for MultiplexerRx<T> {
         }
     }
 
-    fn sync(&mut self) {
+    fn sync_all(&mut self) {
         for channel in self.inputs.iter_mut() {
             channel.sync();
         }
@@ -110,7 +111,7 @@ impl<T: Send + Sync + Clone> nodo::channels::TxBundle for MultiplexerTx<T> {
         "output".to_string()
     }
 
-    fn flush(&mut self) -> Result<(), nodo::channels::MultiFlushError> {
+    fn flush_all(&mut self) -> Result<(), nodo::channels::MultiFlushError> {
         self.output
             .flush()
             .map_err(|e| nodo::channels::MultiFlushError(vec![(0, e)]))

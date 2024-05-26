@@ -1,20 +1,22 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
+use crate::SchemaSet;
 use log::{error, trace};
 use mcap::{
     records::MessageHeader as McapMessageHeader, Channel as McapChannel,
     WriteOptions as McapWriterOptions, Writer as McapWriterImpl,
 };
 use nodo::channels::DoubleBufferRx;
+use nodo::channels::Pop;
 use nodo::codelet::Codelet;
 use nodo::codelet::Context;
-use nodo_core::{Outcome, SchemaDb, SerializedMessage};
+use nodo_core::{Outcome, SerializedMessage};
 
 use nodo_core::{eyre, EyreResult, WrapErr, SUCCESS};
 
 /// Codelet which receives serialized messages and writes them to MCAP
 pub struct McapWriter<'a> {
-    pub(crate) schema_db: SchemaDb,
+    pub(crate) schema_db: SchemaSet,
     pub(crate) channels: Vec<McapChannel<'a>>,
     pub(crate) writer: McapWriterImpl<'a, std::io::BufWriter<std::fs::File>>,
     message_count: usize,
@@ -47,7 +49,7 @@ impl McapWriter<'_> {
             .create(std::io::BufWriter::new(file))
             .wrap_err_with(|| eyre!("could not create MCAP writer for file '{}", cfg.path))?;
 
-        let schema_db = SchemaDb::default();
+        let schema_db = SchemaSet::default();
 
         Ok(Self {
             writer,

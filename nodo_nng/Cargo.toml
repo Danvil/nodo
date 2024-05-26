@@ -1,0 +1,17 @@
+[package]
+name = "nodo_nng"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bincode = "1.3"
+crc = "3.2.1"
+log = "0.4"
+nng = "1.0"
+nodo = { path = "../nodo"}
+nodo_core = { path = "../nodo_core"}
+nodo_std = { path = "../nodo_std"}
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+env_logger = "0.10"

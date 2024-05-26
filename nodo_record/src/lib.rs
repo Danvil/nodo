@@ -2,8 +2,8 @@
 
 mod mcap_writer;
 mod recorder;
-mod serializer;
+mod schema_set;
 
 pub use mcap_writer::*;
 pub use recorder::*;
-pub use serializer::*;
+pub use schema_set::*;

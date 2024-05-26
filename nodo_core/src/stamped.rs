@@ -3,8 +3,9 @@
 use crate::Timestamp;
 use core::ops;
 use core::time::Duration;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Stamp {
     /// Time at which data was acquired by the hardware
     pub acqtime: Acqtime,
@@ -13,12 +14,12 @@ pub struct Stamp {
     pub pubtime: Pubtime,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AcqtimeMarker;
 
 pub type Acqtime = Timestamp<AcqtimeMarker>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PubtimeMarker;
 
 pub type Pubtime = Timestamp<PubtimeMarker>;

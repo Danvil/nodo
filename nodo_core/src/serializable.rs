@@ -2,7 +2,7 @@
 
 use crate::EyreResult;
 use crate::Message;
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 
 /// Serialized data
 #[derive(Clone)]
@@ -15,7 +15,7 @@ pub struct SerializedValue {
 pub type SerializedMessage = Message<SerializedValue>;
 
 /// ID of a channel used for recording data
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RecorderChannelId(pub u16);
 
 impl From<RecorderChannelId> for u16 {
@@ -24,40 +24,24 @@ impl From<RecorderChannelId> for u16 {
     }
 }
 
-/// Types which can be serialize using protobuf
-pub trait ProtoSerializable {
+/// Methods to serialize data to bytes and deserialize bytes to data.
+pub trait BinaryFormat<T> {
     /// Schema used for this message type
-    fn schema() -> Schema;
+    fn schema(&self) -> Schema;
 
-    /// Serializes itself into bytes
-    fn into_proto(self) -> EyreResult<Vec<u8>>;
+    /// Serialize data into bytes
+    fn serialize(&self, data: &T) -> EyreResult<Vec<u8>>;
+
+    /// Deserialize data from bytes
+    fn deserialize(&self, buffer: Vec<u8>) -> EyreResult<T>;
 }
 
 /// Schema definition used to describe the data type of a serialized message
-#[derive(Eq, Hash, PartialEq, Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Schema {
     /// Name of the type
     pub name: String,
 
     /// Encoding used to serialize the message, e.g. "protobuf"
     pub encoding: String,
-}
-
-/// Collection of known schemas
-///
-/// See also: https://mcap.dev/spec/registry#well-known-schema-encodings
-#[derive(Default)]
-pub struct SchemaDb {
-    schemas: HashMap<Schema, &'static [u8]>,
-}
-
-impl SchemaDb {
-    pub fn insert(&mut self, schema: Schema, def: &'static [u8]) {
-        self.schemas.insert(schema, def);
-    }
-
-    /// Looks up a schema
-    pub fn lookup(&self, schema: &Schema) -> Option<&'static [u8]> {
-        self.schemas.get(schema).copied()
-    }
 }

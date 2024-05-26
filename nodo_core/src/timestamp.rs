@@ -3,8 +3,9 @@
 use core::marker::PhantomData;
 use core::ops;
 use core::time::Duration;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Timestamp<M>(Duration, PhantomData<M>);
 
 impl<M> Timestamp<M> {

@@ -129,12 +129,6 @@ impl Worker {
                 accurate_sleep_until(next_instant);
             }
 
-            // execute
-            state.schedule.spin();
-            if state.schedule.is_terminated() {
-                break;
-            }
-
             // handle requests
             match state.rx_request.try_recv() {
                 Ok(WorkerRequest::Stop) => break,
@@ -146,6 +140,12 @@ impl Worker {
                     // FIXME
                 }
             };
+
+            // execute
+            state.schedule.spin();
+            if state.schedule.is_terminated() {
+                break;
+            }
         }
 
         state.schedule.finalize();

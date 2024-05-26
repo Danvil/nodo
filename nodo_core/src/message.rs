@@ -3,10 +3,10 @@ use crate::Stamp;
 use crate::WithAcqtime;
 
 /// A data value with timestamps and sequence number
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Message<T> {
     /// Sequence number as issued by transmitter
-    pub seq: usize,
+    pub seq: u64,
 
     /// Timestamps
     pub stamp: Stamp,

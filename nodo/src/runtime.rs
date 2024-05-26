@@ -13,6 +13,8 @@ use futures::{future::FutureExt, task::ArcWake};
 use std::sync::Arc;
 
 pub struct Runtime {
+    tx_control: std::sync::mpsc::SyncSender<RuntimeControl>,
+    rx_control: std::sync::mpsc::Receiver<RuntimeControl>,
     tx_spawn: std::sync::mpsc::SyncSender<Arc<Task>>,
     rx_spawn: std::sync::mpsc::Receiver<Arc<Task>>,
     codelet_exec: CodeletExecutor,
@@ -26,11 +28,21 @@ impl ArcWake for DummyTask {
 
 type TaskBoxFuture = Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>;
 
+#[derive(Debug, Clone, Copy)]
+pub enum RuntimeControl {
+    /// Request the runtime to stop. It may take a while for the runtime to shut down as codelets
+    /// will finish stepping and stop will be called for all active codelets.
+    RequestStop,
+}
+
 impl Runtime {
     pub fn new() -> Self {
+        let (tx_control, rx_control) = std::sync::mpsc::sync_channel(16);
         let (tx_spawn, rx_spawn) = std::sync::mpsc::sync_channel(16);
         let codelet_exec = CodeletExecutor::new();
         Self {
+            tx_control,
+            rx_control,
             tx_spawn,
             rx_spawn,
             codelet_exec,
@@ -58,23 +70,42 @@ impl Runtime {
         self.codelet_exec.request_stop();
     }
 
-    /// Installs a signal handler, waits until Ctrl+C is pressed, and then stops all execution.
-    pub fn wait_for_ctrl_c(&mut self) {
-        let (tx, rx) = std::sync::mpsc::channel();
-
-        ctrlc::set_handler(move || tx.send(()).expect("Could not send signal on channel."))
-            .expect("Error setting Ctrl-C handler");
-
-        log::warn!("Executing until Ctrl+C is pressed..");
-        rx.recv().expect("Could not receive from channel.");
-
-        log::warn!("Received Ctrl+C! Requesting stop and waiting for workers to finish..");
-        self.request_stop();
-        self.join().unwrap();
-        log::info!("All workers stopped.");
+    pub fn tx_control(&mut self) -> std::sync::mpsc::SyncSender<RuntimeControl> {
+        self.tx_control.clone()
     }
 
-    pub fn spawn<T: 'static>(&mut self, task: T) {
+    pub fn spin(&mut self) {
+        loop {
+            let ctrl = self
+                .rx_control
+                .recv()
+                .expect("Could not receive from channel.");
+            match ctrl {
+                RuntimeControl::RequestStop => {
+                    log::warn!("Received {:?} Stopping all workers..", ctrl);
+                    self.request_stop();
+                    self.join().unwrap();
+                    log::info!("All workers stopped.");
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Installs a signal handler, waits until Ctrl+C is pressed, and then stops all execution.
+    pub fn wait_for_ctrl_c(&mut self) {
+        let tx = self.tx_control();
+        ctrlc::set_handler(move || {
+            tx.send(RuntimeControl::RequestStop)
+                .expect("Could not send signal on channel.")
+        })
+        .expect("Error setting Ctrl-C handler");
+
+        log::warn!("Executing until Ctrl+C is pressed..");
+        self.spin();
+    }
+
+    pub fn spawn<T: 'static>(&mut self, _task: T) {
         // self.tx_spawn.send(Box::new(task));
     }
 
