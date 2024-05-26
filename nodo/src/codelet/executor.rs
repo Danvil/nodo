@@ -4,12 +4,12 @@ use crate::codelet::ScheduleExecutor;
 use crate::codelet::Statistics;
 use crate::codelet::TaskClock;
 use crate::sleep::accurate_sleep_until;
-use nodo_core::ClockId;
 use nodo_core::MonotonicClock;
+use nodo_core::PubtimeMarker;
 use std::collections::HashMap;
 
 pub struct Executor {
-    clock: MonotonicClock,
+    clock: MonotonicClock<PubtimeMarker>,
     workers: Vec<Worker>,
 }
 
@@ -38,7 +38,7 @@ pub struct WorkerState {
 impl Executor {
     pub fn new() -> Self {
         Self {
-            clock: MonotonicClock::new(ClockId::default()),
+            clock: MonotonicClock::new(),
             workers: Vec::new(),
         }
     }

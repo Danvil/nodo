@@ -6,8 +6,8 @@ use crate::channels::OverflowPolicy;
 use crate::channels::StrictlyIncreasingLinear;
 use crate::channels::{Rx, Tx};
 use core::num::NonZeroU64;
-use eyre::eyre;
-use nodo_core::EyreResult;
+use core::ops;
+use std::collections::vec_deque;
 use std::fmt;
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -26,7 +26,7 @@ pub fn fixed_channel<T: Clone + Send + Sync>(
 /// technical limitation as some error codes use 64-bit bitmasks.
 pub const MAX_RECEIVER_COUNT: usize = 64;
 
-/// The producing side of a double-buffered SP-MC channel
+/// The transmitting side of a double-buffered SP-MC channel
 ///
 /// Messages in the outbox are sent to all connected receivers. Each receiver gets its own copy.
 /// If there is more than one receiver `clone` is used to duplicate the message. Messages with
@@ -36,7 +36,15 @@ pub struct DoubleBufferTx<T> {
     connections: Vec<SharedBackStage<T>>,
 }
 
-/// The consuming side of a double-buffered SP-MC channel
+/// The receiving side of a double-buffered SP-MC channel
+///
+/// A FIFO queue using two buffers: a front stage and a back stage. A transmitter is adding items
+/// to the back stage when the transmitter is flushed. Items are moved to the front stage when
+/// with sync.
+///
+/// Note that `sync` will clear all remaining items from the front
+/// stage and move all items from the back stage to the front stage. Thus queue overflow can only
+/// happen during `push`.
 pub struct DoubleBufferRx<T> {
     back: SharedBackStage<T>,
     front: FrontStage<T>,
@@ -70,14 +78,14 @@ impl<T> DoubleBufferTx<T> {
     }
 
     /// Puts a message in the outbox
-    pub fn send(&mut self, value: T) -> Result<(), TxSendError> {
+    pub fn push(&mut self, value: T) -> Result<(), TxSendError> {
         self.outbox.push(value).map_err(|_| TxSendError::QueueFull)
     }
 
     /// Puts multiple messages in the outbox
-    pub fn send_many<I: IntoIterator<Item = T>>(&mut self, values: I) -> Result<(), TxSendError> {
+    pub fn push_many<I: IntoIterator<Item = T>>(&mut self, values: I) -> Result<(), TxSendError> {
         for x in values.into_iter() {
-            self.send(x)?;
+            self.push(x)?;
         }
         Ok(())
     }
@@ -88,25 +96,25 @@ impl<T> DoubleBufferTx<T> {
     /// limit per transmitter (64 at the moment). Certain policy combinations are forbidden. For
     /// example it is an error to connect a receiver with the "Reject" policy to a transmitter
     /// with the "Resize" policy as this will lead to failed message passing.
-    pub fn connect(&mut self, rx: &mut DoubleBufferRx<T>) -> EyreResult<()>
+    pub fn connect(&mut self, rx: &mut DoubleBufferRx<T>) -> Result<(), TxConnectError>
     where
         T: Send + Sync,
     {
         if rx.is_connected() {
-            return Err(eyre!("RX cannot be connected twice"));
+            return Err(TxConnectError::ReceiverAlreadyConnected);
         }
 
         if self.connections.len() >= MAX_RECEIVER_COUNT {
-            return Err(eyre!("TX exceeded maximum connection count"));
+            return Err(TxConnectError::MaxConnectionCountExceeded);
         }
 
-        if matches!(self.outbox.policy(), OverflowPolicy::Resize(_))
-            && matches!(rx.back.read().unwrap().policy(), OverflowPolicy::Reject)
+        if matches!(self.outbox.overflow_policy(), OverflowPolicy::Resize(_))
+            && matches!(
+                rx.back.read().unwrap().overflow_policy(),
+                OverflowPolicy::Reject
+            )
         {
-            return Err(eyre!(
-                "Cannot connect a TX with policy `Resize` to an RX with policy `Reject`.
-                 Either change the TX policy to `Reject` or the RX policy to `Resize` or `Forget`."
-            ));
+            return Err(TxConnectError::PolicyMismatch);
         }
 
         self.connections.push(rx.back.clone());
@@ -114,6 +122,21 @@ impl<T> DoubleBufferTx<T> {
 
         Ok(())
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum TxConnectError {
+    #[error("RX cannot be connected to more than one transmitter")]
+    ReceiverAlreadyConnected,
+
+    #[error("TX exceeded maximum connection count")]
+    MaxConnectionCountExceeded,
+
+    #[error(
+        "Cannot connect a TX with policy `Resize` to an RX with policy `Reject`.
+             Either change the TX policy to `Reject` or the RX policy to `Resize` or `Forget`."
+    )]
+    PolicyMismatch,
 }
 
 impl<T: Send + Sync + Clone> Tx for DoubleBufferTx<T> {
@@ -228,32 +251,49 @@ impl<T> DoubleBufferRx<T> {
     }
 
     /// Removes the next message from the inbox
-    pub fn recv(&mut self) -> Result<T, RxRecvError> {
+    pub fn pop(&mut self) -> Result<T, RxRecvError> {
         match self.front.pop() {
             Some(x) => Ok(x),
             None => Err(RxRecvError::QueueEmtpy),
         }
     }
 
-    pub fn try_recv(&mut self) -> Option<T> {
-        self.recv().ok()
+    pub fn try_pop(&mut self) -> Option<T> {
+        self.pop().ok()
     }
 
-    pub fn try_recv_update<'a, 'b>(&'a mut self, other: &'b mut Option<T>) -> &'b mut Option<T> {
-        match self.try_recv() {
+    pub fn try_pop_update<'a, 'b>(&'a mut self, other: &'b mut Option<T>) -> &'b mut Option<T> {
+        match self.try_pop() {
             Some(x) => *other = Some(x),
             None => {}
         }
         other
     }
 
-    pub fn recv_all(&mut self) -> std::collections::vec_deque::Drain<'_, T> {
-        self.front.drain_all()
+    pub fn pop_all(&mut self) -> std::collections::vec_deque::Drain<'_, T> {
+        self.front.drain(..)
     }
 
     /// Returns true if the inbox is empty.
     pub fn is_empty(&self) -> bool {
         self.front.len() == 0
+    }
+
+    /// Number of messages currently visible. Additional messages might be stored in the stage
+    /// buffer.
+    pub fn len(&self) -> usize {
+        self.front.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.front.clear();
+    }
+
+    pub fn drain<R>(&mut self, range: R) -> vec_deque::Drain<'_, T>
+    where
+        R: ops::RangeBounds<usize>,
+    {
+        self.front.drain(range)
     }
 }
 
@@ -311,7 +351,7 @@ mod tests {
 
         let (mut tx, mut rx) = fixed_channel(NUM_MESSAGES);
 
-        // channel used for synchronizing sender and receiver threads
+        // channel used for synchronizing tx and rx threads
         let (sync_tx, sync_rx) = mpsc::sync_channel(1);
         let (rep_tx, rep_rx) = mpsc::sync_channel(1);
 
@@ -325,7 +365,7 @@ mod tests {
 
                 // receive messages
                 for i in 0..NUM_MESSAGES {
-                    assert_eq!(rx.recv().unwrap(), format!("hello {k} {i}"));
+                    assert_eq!(rx.pop().unwrap(), format!("hello {k} {i}"));
                 }
             }
         });
@@ -335,7 +375,7 @@ mod tests {
             for k in 0..NUM_ROUNDS {
                 // send messages
                 for i in 0..NUM_MESSAGES {
-                    tx.send(format!("hello {k} {i}")).unwrap();
+                    tx.push(format!("hello {k} {i}")).unwrap();
                 }
                 tx.flush().unwrap();
 

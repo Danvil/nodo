@@ -1,20 +1,8 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
+use core::ops;
+use std::collections::vec_deque;
 use std::collections::VecDeque;
-
-/// A double-buffered FIFO queue
-///
-/// A FIFO queue using two buffers: a front stage and a back stage. Items added to the queue
-/// (`push`) are added to the back stage. The queue policy determines what will happen if the back
-/// stage is full when a new item is at capactiy. Items removed from the queue (`pop`) are taken
-/// from the front staging area. Items accumulated in the back stage need to be moved to the front
-/// stage manually by calling `sync`. Note that `sync` will clear all remaining items from the front
-/// stage and move all items from the back stage to the front stage. Thus queue overflow can only
-/// happen during `push`.
-pub struct StageQueue<T> {
-    back: BackStage<T>,
-    front: FrontStage<T>,
-}
 
 /// The front stage of StageQueue
 pub struct FrontStage<T> {
@@ -26,7 +14,7 @@ pub struct FrontStage<T> {
 pub struct BackStage<T> {
     items: VecDeque<T>,
     capacity: usize,
-    policy: OverflowPolicy,
+    overflow_policy: OverflowPolicy,
 }
 
 /// Push policy in case the back stage is at capacity when an item is pushed.
@@ -45,39 +33,6 @@ pub enum OverflowPolicy {
 pub struct StrictlyIncreasingLinear {
     addend: usize,
     factor: usize,
-}
-
-impl<T> StageQueue<T> {
-    pub fn new(capacity: usize, policy: OverflowPolicy) -> StageQueue<T> {
-        StageQueue {
-            back: BackStage::new(capacity, policy),
-            front: FrontStage::new(capacity),
-        }
-    }
-
-    pub fn capacity(&self) -> usize {
-        self.back.capacity()
-    }
-
-    pub fn push(&mut self, value: T) -> Result<(), T> {
-        self.back.push(value)
-    }
-
-    pub fn sync(&mut self) {
-        self.back.sync(&mut self.front);
-    }
-
-    pub fn len(&mut self) -> usize {
-        self.front.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.front.is_empty()
-    }
-
-    pub fn pop(&mut self) -> Option<T> {
-        self.front.pop()
-    }
 }
 
 impl<T> FrontStage<T> {
@@ -100,26 +55,33 @@ impl<T> FrontStage<T> {
         self.len() == 0
     }
 
+    pub fn clear(&mut self) {
+        self.items.clear()
+    }
+
     pub fn pop(&mut self) -> Option<T> {
         self.items.pop_front()
     }
 
-    pub fn drain_all(&mut self) -> std::collections::vec_deque::Drain<'_, T> {
-        self.items.drain(..)
+    pub fn drain<R>(&mut self, range: R) -> vec_deque::Drain<'_, T>
+    where
+        R: ops::RangeBounds<usize>,
+    {
+        self.items.drain(range)
     }
 }
 
 impl<T> BackStage<T> {
-    pub fn new(capacity: usize, policy: OverflowPolicy) -> Self {
+    pub fn new(capacity: usize, overflow_policy: OverflowPolicy) -> Self {
         Self {
             items: VecDeque::with_capacity(capacity),
             capacity,
-            policy,
+            overflow_policy,
         }
     }
 
-    pub fn policy(&self) -> &OverflowPolicy {
-        &self.policy
+    pub fn overflow_policy(&self) -> &OverflowPolicy {
+        &self.overflow_policy
     }
 
     pub fn capacity(&self) -> usize {
@@ -132,7 +94,7 @@ impl<T> BackStage<T> {
 
     pub fn push(&mut self, value: T) -> Result<(), T> {
         if self.items.len() == self.capacity {
-            match &self.policy {
+            match &self.overflow_policy {
                 OverflowPolicy::Reject => return Err(value),
                 OverflowPolicy::Forget => {
                     self.items.pop_front();
@@ -150,7 +112,8 @@ impl<T> BackStage<T> {
     /// Clears the front stage and moves all items from the backstage to the front stage
     pub fn sync(&mut self, other: &mut FrontStage<T>) {
         other.items.clear();
-        if matches!(self.policy, OverflowPolicy::Resize { .. }) {
+
+        if matches!(self.overflow_policy, OverflowPolicy::Resize { .. }) {
             other.items.reserve_exact(self.capacity());
         } else {
             assert_eq!(other.capacity(), self.capacity());
@@ -216,8 +179,47 @@ impl StrictlyIncreasingLinear {
 #[cfg(test)]
 mod tests {
     use crate::channels::stage_queue::OverflowPolicy;
-    use crate::channels::stage_queue::StageQueue;
     use crate::channels::stage_queue::StrictlyIncreasingLinear;
+    use crate::channels::BackStage;
+    use crate::channels::FrontStage;
+
+    pub struct StageQueue<T> {
+        back: BackStage<T>,
+        front: FrontStage<T>,
+    }
+
+    impl<T> StageQueue<T> {
+        pub fn new(capacity: usize, policy: OverflowPolicy) -> StageQueue<T> {
+            StageQueue {
+                back: BackStage::new(capacity, policy),
+                front: FrontStage::new(capacity),
+            }
+        }
+
+        pub fn capacity(&self) -> usize {
+            self.back.capacity()
+        }
+
+        pub fn push(&mut self, value: T) -> Result<(), T> {
+            self.back.push(value)
+        }
+
+        pub fn sync(&mut self) {
+            self.back.sync(&mut self.front);
+        }
+
+        pub fn len(&mut self) -> usize {
+            self.front.len()
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self.front.is_empty()
+        }
+
+        pub fn pop(&mut self) -> Option<T> {
+            self.front.pop()
+        }
+    }
 
     #[test]
     fn test_push_resize() {

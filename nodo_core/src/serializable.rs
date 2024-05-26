@@ -1,18 +1,18 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::EyreResult;
-use crate::Timestamp;
+use crate::Message;
 use std::collections::HashMap;
 
-/// A serialized message
+/// Serialized data
 #[derive(Clone)]
-pub struct SerializedMessage {
+pub struct SerializedValue {
     pub channel_id: RecorderChannelId,
-    pub sequence: u32,
-    pub acqtime: Timestamp,
-    pub pubtime: Timestamp,
     pub buffer: Vec<u8>,
 }
+
+/// A serialized message
+pub type SerializedMessage = Message<SerializedValue>;
 
 /// ID of a channel used for recording data
 #[derive(Clone, Copy)]

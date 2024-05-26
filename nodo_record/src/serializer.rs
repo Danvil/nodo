@@ -9,16 +9,18 @@ use nodo::codelet::Context;
 use nodo_core::EyreResult;
 use nodo_core::Outcome;
 use nodo_core::ProtoSerializable;
+use nodo_core::Pubtime;
 use nodo_core::RecorderChannelId;
 use nodo_core::SerializedMessage;
-use nodo_core::Timestamp;
+use nodo_core::SerializedValue;
+use nodo_core::Stamp;
 use nodo_core::WithAcqtime;
 use nodo_core::SUCCESS;
 
 /// A codelet which serializes a message
 pub struct Serializer<T> {
     channel_id: RecorderChannelId,
-    sequence: u32,
+    sequence: usize,
     pd: PhantomData<T>,
 }
 
@@ -49,7 +51,7 @@ where
     }
 
     fn step(&mut self, cx: &Context<Self>, rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
-        while let Some(message) = rx.0.try_recv() {
+        while let Some(message) = rx.0.try_pop() {
             // Sequence number is increased first independent of message processing success. Thus
             // it is visible in the recorded log if messages are missing.
             self.sequence += 1;
@@ -71,15 +73,19 @@ where
     fn send_one(
         &mut self,
         message: T,
-        pubtime: Timestamp,
+        pubtime: Pubtime,
         tx: &mut DoubleBufferTx<SerializedMessage>,
-    ) -> EyreResult<()> {
-        tx.send(SerializedMessage {
-            channel_id: self.channel_id,
-            sequence: self.sequence - 1,
-            acqtime: *message.acqtime(),
-            pubtime: pubtime,
-            buffer: message.into_proto()?,
+    ) -> Outcome {
+        tx.push(SerializedMessage {
+            seq: self.sequence - 1,
+            stamp: Stamp {
+                acqtime: message.acqtime(),
+                pubtime: pubtime,
+            },
+            value: SerializedValue {
+                channel_id: self.channel_id,
+                buffer: message.into_proto()?,
+            },
         })?;
         Ok(())
     }

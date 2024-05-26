@@ -15,6 +15,7 @@ pub fn rx_bundle_derive(input: TokenStream) -> TokenStream {
 
 fn impl_rx_bundle_derive(input: &syn::DeriveInput) -> TokenStream {
     let name = &input.ident;
+    let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
     let name_str = name.to_string();
 
     let fields = match &input.data {
@@ -34,7 +35,7 @@ fn impl_rx_bundle_derive(input: &syn::DeriveInput) -> TokenStream {
         .collect::<Vec<_>>();
 
     let gen = quote! {
-        impl nodo::channels::RxBundle for #name {
+        impl #impl_generics nodo::channels::RxBundle for #name #type_generics #where_clause {
             fn name(&self, index: usize) -> String {
                 match index {
                     #(#field_index => (#field_name_str).to_string(),)*
@@ -69,6 +70,7 @@ pub fn tx_bundle_derive(input: TokenStream) -> TokenStream {
 
 fn impl_tx_bundle_derive(input: &syn::DeriveInput) -> TokenStream {
     let name = &input.ident;
+    let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
     let name_str = name.to_string();
 
     let fields = match &input.data {
@@ -88,7 +90,7 @@ fn impl_tx_bundle_derive(input: &syn::DeriveInput) -> TokenStream {
         .collect::<Vec<_>>();
 
     let gen = quote! {
-        impl nodo::channels::TxBundle for #name {
+        impl #impl_generics nodo::channels::TxBundle for #name #type_generics #where_clause {
             fn name(&self, index: usize) -> String {
                 match index {
                     #(#field_index => (#field_name_str).to_string(),)*

@@ -7,7 +7,6 @@ use nodo::channels::{Rx, Tx};
 use nodo::codelet::Codelet;
 use nodo::codelet::Context;
 use nodo_core::ensure;
-use nodo_core::EyreResult;
 use nodo_core::Outcome;
 use nodo_core::SUCCESS;
 
@@ -145,13 +144,13 @@ impl<T: Send + Sync + Clone> Codelet for Multiplexer<T> {
 
     fn step(&mut self, _cx: &Context<Self>, rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
         // React to channel selection
-        if let Some(MultiplexerSelection(selection)) = rx.selection.try_recv() {
+        if let Some(MultiplexerSelection(selection)) = rx.selection.try_pop() {
             self.update_selection(Some(selection), rx.inputs.len())?;
         }
 
         // First forward messages from selected input
         if let Some(selection) = self.selection {
-            tx.output.send_many(rx.inputs[selection].recv_all())?;
+            tx.output.push_many(rx.inputs[selection].drain(..))?;
         }
 
         // Then discard all messages from other inputs
@@ -160,7 +159,7 @@ impl<T: Send + Sync + Clone> Codelet for Multiplexer<T> {
                 continue;
             }
 
-            channel.recv_all();
+            channel.drain(..);
         }
 
         SUCCESS
@@ -168,11 +167,7 @@ impl<T: Send + Sync + Clone> Codelet for Multiplexer<T> {
 }
 
 impl<T> Multiplexer<T> {
-    fn update_selection(
-        &mut self,
-        selection: Option<usize>,
-        channel_count: usize,
-    ) -> EyreResult<()> {
+    fn update_selection(&mut self, selection: Option<usize>, channel_count: usize) -> Outcome {
         if let Some(selection) = selection {
             ensure!(
                 selection < channel_count,

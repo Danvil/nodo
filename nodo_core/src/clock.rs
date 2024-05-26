@@ -1,6 +1,9 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::Timestamp;
+use core::cell::RefCell;
+use core::marker::PhantomData;
+use std::sync::Arc;
 use std::time::Instant;
 
 const DEFAULT_CLOCK_ID: u64 = 0;
@@ -26,38 +29,46 @@ impl ClockId {
     }
 }
 
-pub trait Clock {
-    fn id(&self) -> ClockId;
-    fn now(&self) -> Timestamp;
+pub trait Clock<M> {
+    fn now(&self) -> Timestamp<M>;
 }
 
 #[derive(Clone)]
-pub struct MonotonicClock {
-    clock_id: ClockId,
+pub struct MonotonicClock<M> {
     reference: Instant,
+    _marker: PhantomData<M>,
 }
 
-impl Clock for MonotonicClock {
-    fn id(&self) -> ClockId {
-        self.clock_id
-    }
-
-    fn now(&self) -> Timestamp {
-        Timestamp::new(self.clock_id, self.reference.elapsed())
+impl<M> Clock<M> for MonotonicClock<M> {
+    fn now(&self) -> Timestamp<M> {
+        Timestamp::new(self.reference.elapsed())
     }
 }
 
-impl MonotonicClock {
-    pub fn new(clock_id: ClockId) -> Self {
+impl<M> MonotonicClock<M> {
+    pub fn new() -> Self {
         Self {
-            clock_id,
             reference: Instant::now(),
+            _marker: PhantomData,
         }
     }
 }
 
-impl Default for MonotonicClock {
+impl<M> Default for MonotonicClock<M> {
     fn default() -> Self {
-        MonotonicClock::new(ClockId::default())
+        MonotonicClock::new()
+    }
+}
+
+#[derive(Clone)]
+pub struct SharedMonotonicClock<M>(Arc<RefCell<MonotonicClock<M>>>);
+
+impl<M> SharedMonotonicClock<M> {
+    pub fn new() -> Self {
+        Self(Arc::new(RefCell::new(MonotonicClock::new())))
+    }
+
+    pub fn now(&self) -> Timestamp<M> {
+        self.0.borrow().now()
     }
 }

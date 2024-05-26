@@ -3,16 +3,14 @@
 mod clock;
 #[macro_use]
 mod outcome;
+mod message;
 mod serializable;
 mod stamped;
 mod timestamp;
 
 pub use clock::*;
+pub use message::*;
 pub use outcome::*;
 pub use serializable::*;
 pub use stamped::*;
 pub use timestamp::*;
-
-pub trait WithAcqtime {
-    fn acqtime(&self) -> &Timestamp;
-}

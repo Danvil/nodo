@@ -45,7 +45,7 @@ impl Codelet for Alice {
     }
 
     fn step(&mut self, _: &Context<Self>, _: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
-        tx.ping.send(Ping(format!("hello_{}", self.num_sent)))?;
+        tx.ping.push(Ping(format!("hello_{}", self.num_sent)))?;
         self.num_sent += 1;
         SUCCESS
     }
@@ -80,7 +80,7 @@ impl Codelet for Bob {
     }
 
     fn step(&mut self, _: &Context<Self>, rx: &mut Self::Rx, _: &mut Self::Tx) -> Outcome {
-        let ping = rx.ping.recv()?;
+        let ping = rx.ping.pop()?;
         assert_eq!(ping.0, format!("hello_{}", self.num_recv));
         self.num_recv += 1;
         SUCCESS

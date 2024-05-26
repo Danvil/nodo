@@ -31,7 +31,7 @@ impl<T: Send + Sync + Clone> Codelet for NullRx<T> {
     }
 
     fn step(&mut self, _cx: &Context<Self>, rx: &mut Self::Rx, _tx: &mut Self::Tx) -> Outcome {
-        rx.0.recv_all();
+        rx.0.drain(..);
         SUCCESS
     }
 }

@@ -122,7 +122,7 @@ impl<T: Send + Sync + Clone> Codelet for Join<T> {
 
     fn step(&mut self, _: &Context<Self>, rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
         for channel in rx.inputs.iter_mut() {
-            tx.output.send_many(channel.recv_all())?;
+            tx.output.push_many(channel.drain(..))?;
         }
         SUCCESS
     }

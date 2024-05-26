@@ -80,7 +80,7 @@ impl Codelet for McapWriter<'_> {
         // TODO implement policies to drop messages when queue gets too full
 
         let mut count = 0;
-        while let Some(message) = rx.0.try_recv() {
+        while let Some(message) = rx.0.try_pop() {
             match self.write_message(message) {
                 Ok(()) => count += 1,
                 Err(err) => error!("error writing message to MCAP file: {err:?}"),
@@ -119,12 +119,12 @@ impl McapWriter<'_> {
     fn write_message(&mut self, message: SerializedMessage) -> EyreResult<()> {
         self.writer.write_to_known_channel(
             &McapMessageHeader {
-                channel_id: message.channel_id.into(),
-                sequence: message.sequence,
-                log_time: message.acqtime.as_nanos().try_into()?,
-                publish_time: message.pubtime.as_nanos().try_into()?,
+                channel_id: message.value.channel_id.into(),
+                sequence: message.seq.try_into().unwrap(),
+                log_time: message.stamp.acqtime.as_nanos().try_into()?,
+                publish_time: message.stamp.pubtime.as_nanos().try_into()?,
             },
-            &message.buffer,
+            &message.value.buffer,
         )?;
         Ok(())
     }
