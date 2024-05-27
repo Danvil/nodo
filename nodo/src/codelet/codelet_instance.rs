@@ -52,6 +52,8 @@ impl<C: Codelet> CodeletInstance<C> {
     }
 
     pub fn start(&mut self) -> Outcome {
+        log::trace!("'{}' start begin", self.name);
+
         let cc = self.rx.check_connection();
         if !cc.is_fully_connected() {
             error!(
@@ -92,10 +94,13 @@ impl<C: Codelet> CodeletInstance<C> {
         )?;
         self.tx.flush_all()?;
 
+        log::trace!("'{}' start end", self.name);
+
         SUCCESS
     }
 
     pub fn stop(&mut self) -> Outcome {
+        log::trace!("'{}' stop begin", self.name);
         self.rx.sync_all();
         self.state.stop(
             &Context {
@@ -106,10 +111,12 @@ impl<C: Codelet> CodeletInstance<C> {
             &mut self.tx,
         )?;
         self.tx.flush_all()?;
+        log::trace!("'{}' stop end", self.name);
         SUCCESS
     }
 
     pub fn step(&mut self) -> Outcome {
+        log::trace!("'{}' step begin", self.name);
         self.rx.sync_all();
         self.clock.as_mut().unwrap().step();
         self.state.step(
@@ -121,6 +128,7 @@ impl<C: Codelet> CodeletInstance<C> {
             &mut self.tx,
         )?;
         self.tx.flush_all()?;
+        log::trace!("'{}' step end", self.name);
         SUCCESS
     }
 
