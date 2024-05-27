@@ -26,7 +26,9 @@ pub enum OverflowPolicy {
     /// The oldest item is removed to make room for the new item.
     Forget(usize),
 
-    /// Queue capacity is increased to fit the new item.
+    /// Queue capacity is increased indefinitely to fit the new item. This is a dangerous policy
+    /// as it can lead to unbound memory consumption. Consider to use the 'Forget' or 'Reject'
+    /// policies instead.
     Resize(StrictlyIncreasingLinear),
 }
 
@@ -146,11 +148,15 @@ impl<T> BackStage<T> {
                 }
             }
             OverflowPolicy::Resize(sil) => {
-                let capacity = sil.eval(self.capacity());
-                self.items.reserve_exact(capacity);
+                if self.items.len() == self.items.capacity() {
+                    let new_capacity = sil.eval(self.items.capacity());
+                    self.items.reserve_exact(new_capacity);
+                }
             }
         }
+
         self.items.push_back(value);
+
         Ok(())
     }
 
