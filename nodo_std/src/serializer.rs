@@ -14,6 +14,11 @@ pub struct Serializer<T, BF> {
     marker: PhantomData<T>,
 }
 
+pub struct SerializerConfig {
+    /// Maximum number of messages which can be queued before messages are dropped.
+    pub queue_size: usize,
+}
+
 impl<T, BF> Serializer<T, BF> {
     pub fn new(channel_id: RecorderChannelId, format: BF) -> Self {
         Self {
@@ -29,14 +34,17 @@ where
     T: Send + Sync,
     BF: Send + BinaryFormat<T>,
 {
-    type Config = ();
+    type Config = SerializerConfig;
     type Rx = DoubleBufferRx<Message<T>>;
     type Tx = DoubleBufferTx<SerializedMessage>;
 
-    fn build_bundles(_: &Self::Config) -> (Self::Rx, Self::Tx) {
+    fn build_bundles(cfg: &Self::Config) -> (Self::Rx, Self::Tx) {
         (
-            DoubleBufferRx::new_auto_size(),
-            DoubleBufferTx::new_auto_size(),
+            DoubleBufferRx::new(
+                OverflowPolicy::Forget(cfg.queue_size),
+                RetentionPolicy::Keep,
+            ),
+            DoubleBufferTx::new(cfg.queue_size),
         )
     }
 
