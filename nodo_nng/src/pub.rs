@@ -7,7 +7,8 @@ use log::trace;
 use nng::Protocol;
 use nng::Socket;
 use nodo::prelude::*;
-use nodo_core::SerializedMessage;
+use nodo_core::Topic;
+use nodo_core::WithTopic;
 
 /// Codelet which receives serialized messages and writes them to MCAP
 pub struct NngPub {
@@ -31,7 +32,7 @@ impl Default for NngPub {
 
 impl Codelet for NngPub {
     type Config = NngPubConfig;
-    type Rx = DoubleBufferRx<SerializedMessage>;
+    type Rx = DoubleBufferRx<Message<WithTopic<Vec<u8>>>>;
     type Tx = ();
 
     fn build_bundles(cfg: &Self::Config) -> (Self::Rx, Self::Tx) {
@@ -64,7 +65,7 @@ impl Codelet for NngPub {
         SUCCESS
     }
 
-    fn stop(&mut self, _cx: &Context<Self>, _: &mut Self::Rx, _: &mut Self::Tx) -> Outcome {
+    fn stop(&mut self, _: &Context<Self>, _: &mut Self::Rx, _: &mut Self::Tx) -> Outcome {
         // SAFETY: guaranteed by start
         let socket = self.socket.take().unwrap();
 
@@ -73,27 +74,47 @@ impl Codelet for NngPub {
         SUCCESS
     }
 
-    fn step(&mut self, _cx: &Context<Self>, rx: &mut Self::Rx, _tx: &mut Self::Tx) -> Outcome {
+    fn step(&mut self, _: &Context<Self>, rx: &mut Self::Rx, _: &mut Self::Tx) -> Outcome {
         // SAFETY: guaranteed by start
         let socket = self.socket.as_mut().unwrap();
 
         while let Some(message) = rx.try_pop() {
+            let topic_buffer = serialize_topic(&message.value.topic);
+
             let header = NngPubSubHeader {
                 magic: NngPubSubHeader::MAGIC,
                 seq: message.seq.try_into()?,
                 stamp: message.stamp,
-                channel_id: message.value.channel_id,
-                payload_checksum: NngPubSubHeader::CRC.checksum(&message.value.buffer),
+                payload_checksum: NngPubSubHeader::CRC.checksum(&message.value.value),
             };
+            let header_buffer = bincode::serialize(&header)?;
 
-            let buffer = bincode::serialize(&header)?;
-            socket.send(&buffer).map_err(|(_, err)| err)?;
+            let outmsg_size = topic_buffer.len() + header_buffer.len() + message.value.value.len();
+            let mut outmsg = nng::Message::with_capacity(outmsg_size);
+            outmsg.push_back(&topic_buffer);
+            outmsg.push_back(&header_buffer);
+            outmsg.push_back(&message.value.value);
 
-            socket.send(&message.value.buffer).map_err(|(_, err)| err)?;
+            socket.send(outmsg).map_err(|(_, err)| err)?;
 
             self.message_count += 1;
         }
 
         SUCCESS
     }
+}
+
+fn serialize_topic(topic: &Topic) -> Vec<u8> {
+    let mut out = match topic {
+        Topic::Text(text) => text.as_bytes().to_vec(),
+        Topic::Id(id) => id.to_string().as_bytes().to_vec(),
+    };
+
+    // The string itself must not contain any NULL terminators.
+    assert!(out.iter().all(|&b| b != 0));
+
+    // The serialized string must be NULL terminated for NNG to work as a topic.
+    out.push(0);
+
+    out
 }

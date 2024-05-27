@@ -1,17 +1,28 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::Timestamp;
+use core::fmt;
 use core::ops;
 use core::time::Duration;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Stamp {
     /// Time at which data was acquired by the hardware
     pub acqtime: Acqtime,
 
     /// Time at which the message was published by the transmitter
     pub pubtime: Pubtime,
+}
+
+impl fmt::Debug for Stamp {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(
+            fmt,
+            "Stamp {{ acq: {:?}, pub: {:?} }}",
+            *self.acqtime, *self.pubtime
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

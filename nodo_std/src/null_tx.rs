@@ -3,7 +3,7 @@
 use core::marker::PhantomData;
 use nodo::prelude::*;
 
-/// A codelet with a single TX which can be connected but which nevers publishes a message.
+/// A codelet with a single transmitter which nevers publishes anything.
 pub struct NullTx<T>(PhantomData<T>);
 
 impl<T> Default for NullTx<T> {

@@ -2,27 +2,40 @@
 
 use crate::EyreResult;
 use crate::Message;
-use serde::{Deserialize, Serialize};
 
-/// Serialized data
+/// A message with a topic. Used by certain codelets to identify messages.
 #[derive(Clone)]
-pub struct SerializedValue {
-    pub channel_id: RecorderChannelId,
-    pub buffer: Vec<u8>,
+pub struct WithTopic<T> {
+    /// The topic of the message
+    pub topic: Topic,
+
+    /// The actual message
+    pub value: T,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Topic {
+    Text(String),
+    Id(u64),
+}
+
+impl<'a> From<&'a str> for Topic {
+    fn from(text: &'a str) -> Self {
+        Topic::Text(String::from(text))
+    }
+}
+
+impl From<&Topic> for String {
+    fn from(topic: &Topic) -> Self {
+        match topic {
+            Topic::Text(text) => text.clone(),
+            Topic::Id(id) => id.to_string(),
+        }
+    }
 }
 
 /// A serialized message
-pub type SerializedMessage = Message<SerializedValue>;
-
-/// ID of a channel used for recording data
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct RecorderChannelId(pub u16);
-
-impl From<RecorderChannelId> for u16 {
-    fn from(other: RecorderChannelId) -> u16 {
-        other.0
-    }
-}
+pub type SerializedMessage = Message<Vec<u8>>;
 
 /// Methods to serialize data to bytes and deserialize bytes to data.
 pub trait BinaryFormat<T> {

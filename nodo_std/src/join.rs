@@ -3,30 +3,50 @@
 use core::marker::PhantomData;
 use nodo::channels::DoubleBufferRx;
 use nodo::channels::DoubleBufferTx;
-use nodo::channels::{Rx, Tx};
+use nodo::channels::Rx;
 use nodo::codelet::Codelet;
 use nodo::codelet::Context;
 use nodo_core::Outcome;
 use nodo_core::SUCCESS;
 
+#[derive(Default)]
+pub struct JoinConfig {
+    pub input_count: usize,
+}
+
 /// Join has multiple input channels and a single output channel. All messages received on any
 /// input channel are sent to the output channel. There is no particular guarantee on the order
 /// of messages on the output channel.
 pub struct Join<T> {
-    pd: PhantomData<T>,
+    marker: PhantomData<T>,
 }
 
 impl<T: Send + Sync + Clone> Default for Join<T> {
     fn default() -> Self {
         Self {
-            pd: PhantomData::default(),
+            marker: PhantomData::default(),
         }
     }
 }
 
-#[derive(Default)]
-pub struct JoinConfig {
-    pub input_count: usize,
+impl<T: Send + Sync + Clone> Codelet for Join<T> {
+    type Config = JoinConfig;
+    type Rx = JoinRx<T>;
+    type Tx = DoubleBufferTx<T>;
+
+    fn build_bundles(cfg: &Self::Config) -> (Self::Rx, Self::Tx) {
+        (
+            JoinRx::new(cfg.input_count),
+            DoubleBufferTx::new_auto_size(),
+        )
+    }
+
+    fn step(&mut self, _: &Context<Self>, rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
+        for channel in rx.inputs.iter_mut() {
+            tx.push_many(channel.drain(..))?;
+        }
+        SUCCESS
+    }
 }
 
 pub struct JoinRx<T> {
@@ -78,52 +98,5 @@ impl<T: Send + Sync> nodo::channels::RxBundle for JoinRx<T> {
             cc.mark(i, channel.is_connected());
         }
         cc
-    }
-}
-
-pub struct JoinTx<T> {
-    pub output: DoubleBufferTx<T>,
-}
-
-impl<T: Send + Sync + Clone> nodo::channels::TxBundle for JoinTx<T> {
-    fn name(&self, index: usize) -> String {
-        if index != 0 {
-            panic!("index must be 0");
-        }
-        "output".to_string()
-    }
-
-    fn flush_all(&mut self) -> Result<(), nodo::channels::MultiFlushError> {
-        self.output
-            .flush()
-            .map_err(|e| nodo::channels::MultiFlushError(vec![(0, e)]))
-    }
-
-    fn check_connection(&self) -> nodo::channels::ConnectionCheck {
-        let mut cc = nodo::channels::ConnectionCheck::new(1);
-        cc.mark(0, self.output.is_connected());
-        cc
-    }
-}
-
-impl<T: Send + Sync + Clone> Codelet for Join<T> {
-    type Config = JoinConfig;
-    type Rx = JoinRx<T>;
-    type Tx = JoinTx<T>;
-
-    fn build_bundles(cfg: &Self::Config) -> (Self::Rx, Self::Tx) {
-        (
-            JoinRx::new(cfg.input_count),
-            Self::Tx {
-                output: DoubleBufferTx::new_auto_size(),
-            },
-        )
-    }
-
-    fn step(&mut self, _: &Context<Self>, rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
-        for channel in rx.inputs.iter_mut() {
-            tx.output.push_many(channel.drain(..))?;
-        }
-        SUCCESS
     }
 }

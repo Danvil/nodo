@@ -3,13 +3,10 @@
 use core::marker::PhantomData;
 use nodo::prelude::*;
 use nodo_core::BinaryFormat;
-use nodo_core::RecorderChannelId;
 use nodo_core::SerializedMessage;
-use nodo_core::SerializedValue;
 
 /// A codelet which serializes a message
 pub struct Serializer<T, BF> {
-    channel_id: RecorderChannelId,
     format: BF,
     marker: PhantomData<T>,
 }
@@ -19,10 +16,15 @@ pub struct SerializerConfig {
     pub queue_size: usize,
 }
 
+impl Default for SerializerConfig {
+    fn default() -> Self {
+        Self { queue_size: 10 }
+    }
+}
+
 impl<T, BF> Serializer<T, BF> {
-    pub fn new(channel_id: RecorderChannelId, format: BF) -> Self {
+    pub fn new(format: BF) -> Self {
         Self {
-            channel_id,
             format,
             marker: PhantomData::default(),
         }
@@ -36,7 +38,7 @@ where
 {
     type Config = SerializerConfig;
     type Rx = DoubleBufferRx<Message<T>>;
-    type Tx = DoubleBufferTx<SerializedMessage>;
+    type Tx = DoubleBufferTx<Message<Vec<u8>>>;
 
     fn build_bundles(cfg: &Self::Config) -> (Self::Rx, Self::Tx) {
         (
@@ -56,10 +58,7 @@ where
                     acqtime: message.stamp.acqtime,
                     pubtime: cx.clock.step_time(),
                 },
-                value: SerializedValue {
-                    channel_id: self.channel_id,
-                    buffer: self.format.serialize(&message.value)?,
-                },
+                value: self.format.serialize(&message.value)?,
             })?;
         }
         SUCCESS

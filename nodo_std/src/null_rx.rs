@@ -3,7 +3,7 @@
 use core::marker::PhantomData;
 use nodo::prelude::*;
 
-/// A codelet with a single RX which can be connected but which ignores all received messages.
+/// A codelet which drops all messages it receives.
 pub struct NullRx<T>(PhantomData<T>);
 
 impl<T> Default for NullRx<T> {
@@ -21,7 +21,7 @@ impl<T: Send + Sync + Clone> Codelet for NullRx<T> {
         (DoubleBufferRx::new_auto_size(), ())
     }
 
-    fn step(&mut self, _cx: &Context<Self>, rx: &mut Self::Rx, _tx: &mut Self::Tx) -> Outcome {
+    fn step(&mut self, _: &Context<Self>, rx: &mut Self::Rx, _: &mut Self::Tx) -> Outcome {
         rx.drain(..);
         SUCCESS
     }

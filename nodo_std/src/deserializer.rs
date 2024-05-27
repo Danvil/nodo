@@ -3,7 +3,6 @@
 use core::marker::PhantomData;
 use nodo::prelude::*;
 use nodo_core::BinaryFormat;
-use nodo_core::SerializedMessage;
 
 /// A codelet which serializes a message
 pub struct Deserializer<T, BF> {
@@ -14,6 +13,12 @@ pub struct Deserializer<T, BF> {
 pub struct DeserializerConfig {
     /// Maximum number of messages which can be queued before messages are dropped.
     pub queue_size: usize,
+}
+
+impl Default for DeserializerConfig {
+    fn default() -> Self {
+        Self { queue_size: 10 }
+    }
 }
 
 impl<T, BF> Deserializer<T, BF> {
@@ -31,7 +36,7 @@ where
     BF: Send + BinaryFormat<T>,
 {
     type Config = DeserializerConfig;
-    type Rx = DoubleBufferRx<SerializedMessage>;
+    type Rx = DoubleBufferRx<Message<Vec<u8>>>;
     type Tx = DoubleBufferTx<Message<T>>;
 
     fn build_bundles(cfg: &Self::Config) -> (Self::Rx, Self::Tx) {
@@ -52,7 +57,7 @@ where
                     acqtime: message.stamp.acqtime,
                     pubtime: cx.clock.step_time(),
                 },
-                value: self.format.deserialize(message.value.buffer)?,
+                value: self.format.deserialize(message.value)?,
             })?;
         }
         SUCCESS

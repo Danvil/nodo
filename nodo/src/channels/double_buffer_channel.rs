@@ -147,23 +147,6 @@ pub enum TxConnectError {
     PolicyMismatch,
 }
 
-impl<T: Send + Sync + Clone> TxBundle for DoubleBufferTx<T> {
-    fn name(&self, index: usize) -> String {
-        assert_eq!(index, 0);
-        String::from("out")
-    }
-
-    fn flush_all(&mut self) -> Result<(), MultiFlushError> {
-        self.flush().map_err(|fe| MultiFlushError(vec![(0, fe)]))
-    }
-
-    fn check_connection(&self) -> ConnectionCheck {
-        let mut cc = ConnectionCheck::new(1);
-        cc.mark(0, self.is_connected());
-        cc
-    }
-}
-
 impl<T: Send + Sync + Clone> Tx for DoubleBufferTx<T> {
     fn flush(&mut self) -> Result<(), FlushError> {
         let mut result = FlushResult::new();
@@ -198,6 +181,58 @@ impl<T: Send + Sync + Clone> Tx for DoubleBufferTx<T> {
 
     fn is_connected(&self) -> bool {
         !self.connections.is_empty()
+    }
+}
+
+impl<T: Send + Sync + Clone> Tx for Option<DoubleBufferTx<T>> {
+    fn flush(&mut self) -> Result<(), FlushError> {
+        if let Some(tx) = self.as_mut() {
+            tx.flush()
+        } else {
+            Ok(())
+        }
+    }
+
+    fn is_connected(&self) -> bool {
+        self.as_ref().map_or(false, |tx| tx.is_connected())
+    }
+}
+
+impl<T: Send + Sync + Clone> TxBundle for DoubleBufferTx<T> {
+    fn name(&self, index: usize) -> String {
+        assert_eq!(index, 0);
+        String::from("out")
+    }
+
+    fn flush_all(&mut self) -> Result<(), MultiFlushError> {
+        self.flush().map_err(|fe| MultiFlushError(vec![(0, fe)]))
+    }
+
+    fn check_connection(&self) -> ConnectionCheck {
+        let mut cc = ConnectionCheck::new(1);
+        cc.mark(0, self.is_connected());
+        cc
+    }
+}
+
+impl<T: Send + Sync + Clone> TxBundle for Option<DoubleBufferTx<T>> {
+    fn name(&self, index: usize) -> String {
+        assert_eq!(index, 0);
+        String::from("out")
+    }
+
+    fn flush_all(&mut self) -> Result<(), MultiFlushError> {
+        if let Some(tx) = self.as_mut() {
+            tx.flush().map_err(|fe| MultiFlushError(vec![(0, fe)]))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn check_connection(&self) -> ConnectionCheck {
+        let mut cc = ConnectionCheck::new(1);
+        cc.mark(0, self.as_ref().map_or(false, |tx| tx.is_connected()));
+        cc
     }
 }
 
@@ -392,6 +427,18 @@ impl<T: Send + Sync> Rx for DoubleBufferRx<T> {
     }
 }
 
+impl<T: Send + Sync> Rx for Option<DoubleBufferRx<T>> {
+    fn is_connected(&self) -> bool {
+        self.as_ref().map_or(false, |rx| rx.is_connected)
+    }
+
+    fn sync(&mut self) {
+        if let Some(rx) = self.as_mut() {
+            rx.sync()
+        }
+    }
+}
+
 impl<T: Send + Sync> RxBundle for DoubleBufferRx<T> {
     fn name(&self, index: usize) -> String {
         assert_eq!(index, 0);
@@ -405,6 +452,25 @@ impl<T: Send + Sync> RxBundle for DoubleBufferRx<T> {
     fn check_connection(&self) -> ConnectionCheck {
         let mut cc = ConnectionCheck::new(1);
         cc.mark(0, self.is_connected());
+        cc
+    }
+}
+
+impl<T: Send + Sync> RxBundle for Option<DoubleBufferRx<T>> {
+    fn name(&self, index: usize) -> String {
+        assert_eq!(index, 0);
+        String::from("in")
+    }
+
+    fn sync_all(&mut self) {
+        if let Some(rx) = self.as_mut() {
+            rx.sync()
+        }
+    }
+
+    fn check_connection(&self) -> ConnectionCheck {
+        let mut cc = ConnectionCheck::new(1);
+        cc.mark(0, self.as_ref().map_or(false, |rx| rx.is_connected()));
         cc
     }
 }

@@ -1,7 +1,7 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
+use crate::EyreResult;
 use crate::NngPubSubHeader;
-use crate::SerializedValue;
 use log::error;
 use log::info;
 use log::trace;
@@ -10,13 +10,14 @@ use nng::options::Options;
 use nng::Protocol;
 use nng::Socket;
 use nodo::prelude::*;
-use nodo_core::SerializedMessage;
+use nodo_core::eyre;
+use nodo_core::Topic;
+use nodo_core::WithTopic;
 
 /// Codelet which receives serialized messages and writes them to MCAP
 pub struct NngSub {
     socket: Option<Socket>,
     message_count: usize,
-    parser: MessageParser,
 }
 
 pub struct NngSubConfig {
@@ -29,7 +30,6 @@ impl Default for NngSub {
         Self {
             socket: None,
             message_count: 0,
-            parser: MessageParser::default(),
         }
     }
 }
@@ -37,7 +37,7 @@ impl Default for NngSub {
 impl Codelet for NngSub {
     type Config = NngSubConfig;
     type Rx = ();
-    type Tx = DoubleBufferTx<SerializedMessage>;
+    type Tx = DoubleBufferTx<Message<WithTopic<Vec<u8>>>>;
 
     fn build_bundles(cfg: &Self::Config) -> (Self::Rx, Self::Tx) {
         ((), DoubleBufferTx::new(cfg.queue_size))
@@ -82,12 +82,15 @@ impl Codelet for NngSub {
 
         loop {
             match socket.try_recv() {
-                Ok(buff) => {
-                    if let Some(msg) = self.parser.push(buff.to_vec()) {
+                Ok(buff) => match Self::parse(buff) {
+                    Ok(msg) => {
                         tx.push(msg)?;
                         self.message_count += 1;
                     }
-                }
+                    Err(err) => {
+                        log::error!("{err:?}");
+                    }
+                },
                 Err(nng::Error::TryAgain) => {
                     break;
                 }
@@ -99,42 +102,46 @@ impl Codelet for NngSub {
     }
 }
 
-/// Helps us figure out which packets are header and which are payload. Also needs to be robust
-/// against dropped messages and messages received out of order.
-#[derive(Default)]
-struct MessageParser {
-    head: Option<Vec<u8>>,
+impl NngSub {
+    fn parse(msg: nng::Message) -> EyreResult<Message<WithTopic<Vec<u8>>>> {
+        // Message has three parts:
+        let data = msg.as_slice();
+
+        // 1) topic: null-terminated string
+        let (cstr, data) = parse_cstr(data)?;
+        let topic: Topic = cstr.into();
+
+        // 2) header: NngPubSubHeader
+        let header: NngPubSubHeader =
+            bincode::deserialize(&data[0..NngPubSubHeader::BINCODE_SIZE])?;
+        if header.magic != NngPubSubHeader::MAGIC {
+            return Err(eyre!("invalid header magic"));
+        }
+
+        // 3) value: [u8]
+        let value = data[NngPubSubHeader::BINCODE_SIZE..].to_vec();
+        let checksum = NngPubSubHeader::CRC.checksum(&value);
+        if header.payload_checksum != checksum {
+            return Err(eyre!(
+                "payload failed checksum test: expected={}, actual={}",
+                header.payload_checksum,
+                checksum
+            ));
+        }
+
+        Ok(Message {
+            seq: header.seq,
+            stamp: header.stamp,
+            value: WithTopic { topic, value },
+        })
+    }
 }
 
-impl MessageParser {
-    pub fn push(&mut self, tail: Vec<u8>) -> Option<SerializedMessage> {
-        if let Some(head) = self.head.take() {
-            // verify that (head, tail) form a message
-            if let Ok::<NngPubSubHeader, _>(header) = bincode::deserialize(&head) {
-                let checksum = NngPubSubHeader::CRC.checksum(&tail);
-                if header.magic == NngPubSubHeader::MAGIC && header.payload_checksum == checksum {
-                    Some(SerializedMessage {
-                        seq: header.seq,
-                        stamp: header.stamp,
-                        value: SerializedValue {
-                            channel_id: header.channel_id,
-                            buffer: tail,
-                        },
-                    })
-                } else {
-                    // something is wrong ...  skip one packet
-                    self.head = Some(tail);
-                    None
-                }
-            } else {
-                // something is wrong ...  skip one packet
-                self.head = Some(tail);
-                None
-            }
-        } else {
-            // first packet
-            self.head = Some(tail);
-            None
-        }
-    }
+fn parse_cstr(utf8_src: &[u8]) -> EyreResult<(&str, &[u8])> {
+    let end = utf8_src
+        .iter()
+        .position(|&c| c == b'\0')
+        .ok_or_else(|| eyre!("null terminator not found"))?;
+
+    Ok(::std::str::from_utf8(&utf8_src[0..end]).map(|x| (x, &utf8_src[end + 1..]))?)
 }

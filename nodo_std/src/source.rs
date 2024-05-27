@@ -3,13 +3,13 @@
 use core::marker::PhantomData;
 use nodo::prelude::*;
 
-/// A codelet with a single TX which can be connected but which nevers publishes a message.
-pub struct CallbackTx<T, F> {
+/// A codelet which calls a callback each tick and publishes what it returns
+pub struct Source<T, F> {
     callback: F,
     marker: PhantomData<T>,
 }
 
-impl<T, F> CallbackTx<T, F> {
+impl<T, F> Source<T, F> {
     pub fn new(callback: F) -> Self {
         Self {
             callback,
@@ -18,7 +18,7 @@ impl<T, F> CallbackTx<T, F> {
     }
 }
 
-impl<T, F> Codelet for CallbackTx<T, F>
+impl<T, F> Codelet for Source<T, F>
 where
     T: Send + Sync + Clone,
     F: FnMut() -> T + Send,

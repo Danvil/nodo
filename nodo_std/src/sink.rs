@@ -3,13 +3,13 @@
 use core::marker::PhantomData;
 use nodo::prelude::*;
 
-/// A codelet with a single RX which calls a callback for every received message
-pub struct CallbackRx<T, F> {
+/// A codelet which calls a callback for every received message
+pub struct Sink<T, F> {
     callback: F,
     marker: PhantomData<T>,
 }
 
-impl<T, F> CallbackRx<T, F> {
+impl<T, F> Sink<T, F> {
     pub fn new(callback: F) -> Self {
         Self {
             callback,
@@ -18,7 +18,7 @@ impl<T, F> CallbackRx<T, F> {
     }
 }
 
-impl<T, F> Codelet for CallbackRx<T, F>
+impl<T, F> Codelet for Sink<T, F>
 where
     T: Send + Sync,
     F: FnMut(T) + Send,
