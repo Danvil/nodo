@@ -52,6 +52,8 @@ impl<C: Codelet> CodeletInstance<C> {
     }
 
     pub fn start(&mut self) -> Outcome {
+        profiling::scope!(&format!("{}_start", self.name));
+
         log::trace!("'{}' start begin", self.name);
 
         let cc = self.rx.check_connection();
@@ -100,6 +102,7 @@ impl<C: Codelet> CodeletInstance<C> {
     }
 
     pub fn stop(&mut self) -> Outcome {
+        profiling::scope!(&format!("{}_stop", self.name));
         log::trace!("'{}' stop begin", self.name);
         self.rx.sync_all();
         self.state.stop(
@@ -116,6 +119,7 @@ impl<C: Codelet> CodeletInstance<C> {
     }
 
     pub fn step(&mut self) -> Outcome {
+        profiling::scope!(&format!("{}_step", self.name));
         log::trace!("'{}' step begin", self.name);
         self.rx.sync_all();
         self.clock.as_mut().unwrap().step();

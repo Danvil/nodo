@@ -8,14 +8,15 @@ edition = "2021"
 [dependencies]
 async-channel = "1.9"
 async-trait = "0.1"
+ctrlc = "3.4"
 eyre = "0.6"
 futures = "0.3"
 log = "0.4"
 nodo_core = { path = "../nodo_core"}
 nodo_derive = { path = "../nodo_derive"}
 paste = "1.0"
+profiling = "1.0"
 thiserror = "1"
-ctrlc = "3.4"
 
 [dev-dependencies]
 color-eyre = "0.6"
