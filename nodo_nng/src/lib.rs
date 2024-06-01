@@ -1,15 +1,23 @@
+use core::marker::PhantomData;
+use core::time::Duration;
+use nodo::codelet::CodeletInstance;
+use nodo::codelet::ScheduleBuilder;
+use nodo::codelet::ScheduleExecutor;
+use nodo::prelude::*;
+use nodo_core::BinaryFormat;
+use nodo_core::EyreResult;
+use nodo_core::Schema;
+use nodo_std::Serializer;
+use nodo_std::SerializerConfig;
+use nodo_std::TopicJoin;
+use nodo_std::TopicJoinConfig;
+use serde::{Deserialize, Serialize};
+
 mod r#pub;
 mod sub;
 
 pub use r#pub::*;
 pub use sub::*;
-
-use core::marker::PhantomData;
-use nodo::prelude::*;
-use nodo_core::BinaryFormat;
-use nodo_core::EyreResult;
-use nodo_core::Schema;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NngPubSubHeader {
@@ -50,6 +58,59 @@ where
 
     fn deserialize(&self, buffer: Vec<u8>) -> EyreResult<T> {
         Ok(bincode::deserialize(&buffer)?)
+    }
+}
+
+/// Helper to simplify publishing serialized messages from multiple channels on the same socket
+pub struct Publisher {
+    tag: String,
+    join: CodeletInstance<TopicJoin<Vec<u8>>>,
+    nng_pub: CodeletInstance<NngPub>,
+    schedule_builder: ScheduleBuilder,
+}
+
+impl Publisher {
+    pub fn new(tag: &str, address: &str) -> Self {
+        let mut join = TopicJoin::instantiate(format!("{tag}_join"), TopicJoinConfig::default());
+        let mut nng_pub = NngPub::instantiate(
+            format!("{tag}_nng_pub"),
+            NngPubConfig {
+                address: address.to_string(),
+                queue_size: 24,
+            },
+        );
+        join.tx.connect(&mut nng_pub.rx).unwrap(); // SAFETY errors guaranteed to not happen
+        Self {
+            tag: tag.to_string(),
+            join,
+            nng_pub,
+            schedule_builder: nodo::codelet::ScheduleBuilder::new()
+                .with_name("vis")
+                .with_period(Duration::from_millis(10)),
+        }
+    }
+
+    pub fn publish<T>(&mut self, topic: &str, tx: &mut DoubleBufferTx<Message<T>>) -> EyreResult<()>
+    where
+        T: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
+    {
+        let mut ser = Serializer::new(Bincode::default()).into_instance(
+            format!("{}_ser_{topic}", self.tag),
+            SerializerConfig::default(),
+        );
+
+        tx.connect(&mut ser.rx)?;
+        ser.tx.connect(&mut self.join.rx.add(topic.into()))?;
+
+        self.schedule_builder.append(ser);
+
+        Ok(())
+    }
+
+    pub fn into_schedule(mut self) -> ScheduleExecutor {
+        self.schedule_builder.append(self.join);
+        self.schedule_builder.append(self.nng_pub);
+        self.schedule_builder.finalize()
     }
 }
 
