@@ -21,7 +21,7 @@ impl<T, F> Sink<T, F> {
 impl<T, F> Codelet for Sink<T, F>
 where
     T: Send + Sync,
-    F: FnMut(T) + Send,
+    F: FnMut(T) -> Outcome + Send,
 {
     type Config = ();
     type Rx = DoubleBufferRx<T>;
@@ -33,7 +33,7 @@ where
 
     fn step(&mut self, _: &Context<Self>, rx: &mut Self::Rx, _: &mut Self::Tx) -> Outcome {
         while let Some(msg) = rx.try_pop() {
-            (self.callback)(msg)
+            (self.callback)(msg)?;
         }
         SUCCESS
     }

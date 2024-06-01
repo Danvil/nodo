@@ -156,8 +156,9 @@ mod tests {
                 assert!(foo.value.number as usize > *rx_counter.read().unwrap());
                 *rx_counter.write().unwrap() += 1;
                 if *rx_counter.read().unwrap() == MESSAGE_COUNT {
-                    ctrl.send(RuntimeControl::RequestStop).unwrap();
+                    ctrl.send(RuntimeControl::RequestStop)?;
                 }
+                Ok(())
             })
             .into_instance("check", ())
         };
