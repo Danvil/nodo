@@ -322,6 +322,16 @@ impl<T> DoubleBufferRx<T> {
         self.front.len()
     }
 
+    /// Returns true if the queue contains the maximum number of elements. A queue with the
+    /// 'Resize' overflow policy will never be full.
+    pub fn is_full(&self) -> bool {
+        // SAFETY FIXME
+        match self.back.read().unwrap().overflow_policy() {
+            OverflowPolicy::Reject(n) | OverflowPolicy::Forget(n) => self.front.len() == *n,
+            OverflowPolicy::Resize(_) => false,
+        }
+    }
+
     pub fn clear(&mut self) {
         self.front.clear();
     }
