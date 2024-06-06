@@ -1,6 +1,7 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 mod cloner;
+mod convert;
 mod deserializer;
 mod join;
 mod log;
@@ -15,6 +16,7 @@ mod topic_join;
 mod topic_split;
 
 pub use cloner::*;
+pub use convert::*;
 pub use deserializer::*;
 pub use join::*;
 pub use log::*;
