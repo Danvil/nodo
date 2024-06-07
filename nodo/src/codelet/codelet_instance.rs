@@ -2,7 +2,6 @@
 
 use crate::channels::{RxBundle, TxBundle};
 use crate::codelet::{Codelet, Context, TaskClock, Transition, SUCCESS};
-use log::error;
 use nodo_core::*;
 
 /// Named instance of a codelet with configuration and channel bundels
@@ -20,7 +19,7 @@ pub struct CodeletInstance<C: Codelet> {
 impl<C: Codelet> Drop for CodeletInstance<C> {
     fn drop(&mut self) {
         if !self.is_scheduled {
-            error!(
+            log::warn!(
                 "Codelet instance `{}` was created and destroyed without every being scheduled",
                 self.name
             );
@@ -58,7 +57,7 @@ impl<C: Codelet> CodeletInstance<C> {
 
         let cc = self.rx.check_connection();
         if !cc.is_fully_connected() {
-            error!(
+            log::warn!(
                 "codelet '{}' (type={}) has unconnected RX channels: {}",
                 self.name,
                 self.type_name(),
@@ -72,7 +71,7 @@ impl<C: Codelet> CodeletInstance<C> {
 
         let cc = self.tx.check_connection();
         if !cc.is_fully_connected() {
-            error!(
+            log::warn!(
                 "codelet '{}' (type={}) has unconnected TX channels: {}",
                 self.name,
                 self.type_name(),
