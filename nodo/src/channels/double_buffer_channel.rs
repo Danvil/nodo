@@ -413,6 +413,30 @@ impl<'a, T1: Pop, T2: Pop> Pop for (&'a mut T1, &'a mut T2) {
     }
 }
 
+impl<'a, T1: Pop, T2: Pop, T3: Pop> Pop for (&'a mut T1, &'a mut T2, &'a mut T3) {
+    type Output = (
+        <T1 as Pop>::Output,
+        <T2 as Pop>::Output,
+        <T3 as Pop>::Output,
+    );
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty() || self.1.is_empty()
+    }
+
+    fn pop(&mut self) -> Result<Self::Output, RxRecvError> {
+        if self.is_empty() {
+            Err(RxRecvError::QueueEmtpy)
+        } else {
+            Ok((
+                self.0.pop().unwrap(),
+                self.1.pop().unwrap(),
+                self.2.pop().unwrap(),
+            ))
+        }
+    }
+}
+
 impl<T> ops::Index<usize> for DoubleBufferRx<T> {
     type Output = T;
 
