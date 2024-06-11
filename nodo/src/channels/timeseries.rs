@@ -115,14 +115,16 @@ pub trait Timeseries<T> {
         self.find_by(criteria, |&(t, _)| t > time)
     }
 
-    fn interpolate<S, F>(&self, time: Duration, f: F) -> Option<S>
+    fn interpolate<S, F>(&self, time: Duration, f: F) -> Result<S, InterpolateError>
     where
-        F: Fn(f64, &T, &T) -> S,
+        F: Fn(f64, &T, &T) -> Option<S>,
     {
         // find i s.t. s[i].time <= time <= s[i+1].time
-        let idx = self.find_index_by_time(FindCriteria::Latest, time)?;
+        let idx = self
+            .find_index_by_time(FindCriteria::Latest, time)
+            .ok_or(InterpolateError::OutOfRange)?;
         if idx + 1 >= self.len() {
-            return None;
+            return Err(InterpolateError::OutOfRange);
         }
 
         let a = self.at(idx);
@@ -131,8 +133,13 @@ pub trait Timeseries<T> {
         // Note: Timestamps are guaranteed to be monotonic increasing.
         let p = (time - a.0).as_secs_f64() / (b.0 - a.0).as_secs_f64();
 
-        Some(f(p, &a.1, &b.1))
+        f(p, &a.1, &b.1).ok_or(InterpolateError::InterpolationFailed)
     }
+}
+
+pub enum InterpolateError {
+    OutOfRange,
+    InterpolationFailed,
 }
 
 pub enum FindCriteria {
