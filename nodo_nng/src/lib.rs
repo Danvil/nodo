@@ -130,6 +130,7 @@ mod tests {
     use nodo_std::DeserializerConfig;
     use nodo_std::Log;
     use nodo_std::Pipe;
+    use nodo_std::PipeConfig;
     use nodo_std::Serializer;
     use nodo_std::SerializerConfig;
     use nodo_std::Sink;
@@ -182,7 +183,7 @@ mod tests {
                 value,
             })
         })
-        .into_instance("add_topic", ());
+        .into_instance("add_topic", PipeConfig::Dynamic);
 
         let mut alice = NngPub::instantiate(
             "alice",
@@ -202,7 +203,7 @@ mod tests {
 
         let mut rmv_topic =
             Pipe::new(|msg: Message<WithTopic<Vec<u8>>>| msg.map(|WithTopic { value, .. }| value))
-                .into_instance("add_topic", ());
+                .into_instance("add_topic", PipeConfig::Dynamic);
 
         let mut de = Deserializer::<Foo, _>::new(Bincode::default())
             .into_instance("de", DeserializerConfig { queue_size: 1 });
