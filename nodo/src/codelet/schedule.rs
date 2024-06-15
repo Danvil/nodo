@@ -286,17 +286,31 @@ impl CodeletExec for CodeletSequence {
     fn execute(&mut self, transition: Transition) -> Outcome {
         let mut result = CodeletSequenceExecuteResult::new();
 
+        let mut is_terminated = true;
         for csm in self.items.iter_mut() {
             match csm.transition(transition) {
                 Err(err) => {
                     result.mark(csm.inner(), err.into());
                     self.has_error = true;
                 }
-                Ok(()) => {}
+                Ok(kind) => {
+                    if !matches!(kind, OutcomeKind::Terminated) {
+                        is_terminated = false;
+                    }
+                }
             }
         }
 
-        result.into()
+        match result.into() {
+            Some(err) => Err(err),
+            None => {
+                if is_terminated {
+                    TERMINATED
+                } else {
+                    RUNNING
+                }
+            }
+        }
     }
 }
 
@@ -337,11 +351,11 @@ impl CodeletSequenceExecuteError {
     }
 }
 
-impl From<CodeletSequenceExecuteResult> for Outcome {
+impl From<CodeletSequenceExecuteResult> for Option<eyre::Report> {
     fn from(value: CodeletSequenceExecuteResult) -> Self {
         match value.maybe {
-            Some(x) => Err(x.into()),
-            None => Ok(()),
+            Some(x) => Some(x.into()),
+            None => None,
         }
     }
 }

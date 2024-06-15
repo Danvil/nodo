@@ -7,8 +7,8 @@ use crate::codelet::CodeletInstance;
 use crate::codelet::Statistics;
 use crate::codelet::TaskClock;
 use crate::codelet::Transition;
-use crate::codelet::TransitionStatistics;
 use nodo_core::Outcome;
+use nodo_core::OutcomeKind;
 
 /// Wrapper around a codelet with additional information
 pub struct Vise {
@@ -48,26 +48,15 @@ impl CodeletExec for Vise {
     }
 
     fn execute(&mut self, transition: Transition) -> Outcome {
-        let _guard = TransitionStatisticsGuard::new(&mut self.statistics.transitions[transition]);
-        self.instance.execute(transition)
-    }
-}
+        let stats = &mut self.statistics.transitions[transition];
+        stats.begin();
 
-/// Helper type to capture statistics
-struct TransitionStatisticsGuard<'a> {
-    statistics: &'a mut TransitionStatistics,
-}
+        let outcome = self.instance.execute(transition);
 
-impl<'a> TransitionStatisticsGuard<'a> {
-    pub fn new(statistics: &'a mut TransitionStatistics) -> Self {
-        statistics.begin();
-        Self { statistics }
-    }
-}
+        let skipped = matches!(outcome, Ok(OutcomeKind::Skipped));
+        stats.end(skipped);
 
-impl<'a> Drop for TransitionStatisticsGuard<'a> {
-    fn drop(&mut self) {
-        self.statistics.end();
+        return outcome;
     }
 }
 

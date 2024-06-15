@@ -140,7 +140,7 @@ impl<T: Send + Sync + Clone> Codelet for Multiplexer<T> {
 
     fn start(&mut self, cx: &Context<Self>, rx: &mut Self::Rx, _tx: &mut Self::Tx) -> Outcome {
         self.update_selection(cx.config.initial_selection, rx.inputs.len())?;
-        Ok(())
+        SUCCESS
     }
 
     fn step(&mut self, _cx: &Context<Self>, rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
@@ -179,6 +179,6 @@ impl<T> Multiplexer<T> {
         } else {
             self.selection = None;
         }
-        Ok(())
+        SUCCESS
     }
 }

@@ -75,7 +75,7 @@ mod tests {
 
         let mut sink = Sink::new(|bar: Bar| {
             assert_eq!(bar.text, "42");
-            Ok(())
+            SUCCESS
         })
         .into_instance("sink", ());
 

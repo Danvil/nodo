@@ -31,13 +31,17 @@ impl<T: Send + Sync + Clone> Codelet for TopicSplit<T> {
     }
 
     fn step(&mut self, _cx: &Context<Self>, rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
-        for msg in rx.drain(..) {
-            if let Some(tx) = tx.find_by_topic(&msg.value.topic) {
-                tx.push(msg.map(|WithTopic { value, .. }| value))?;
+        if rx.is_empty() {
+            SKIPPED
+        } else {
+            for msg in rx.drain(..) {
+                if let Some(tx) = tx.find_by_topic(&msg.value.topic) {
+                    tx.push(msg.map(|WithTopic { value, .. }| value))?;
+                }
             }
-        }
 
-        SUCCESS
+            SUCCESS
+        }
     }
 }
 

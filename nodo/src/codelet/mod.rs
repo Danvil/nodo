@@ -19,7 +19,7 @@ pub use transition::*;
 pub use vise::*;
 
 use crate::channels::{RxBundle, TxBundle};
-use nodo_core::{Outcome, SUCCESS};
+use nodo_core::{Outcome, SKIPPED};
 
 /// Codelets can be implemented by the user to execute work.
 pub trait Codelet: Send {
@@ -37,28 +37,28 @@ pub trait Codelet: Send {
 
     /// Start is guaranteed to be called first. Start may be called again after stop was called.
     fn start(&mut self, _cx: &Context<Self>, _rx: &mut Self::Rx, _tx: &mut Self::Tx) -> Outcome {
-        SUCCESS
+        SKIPPED
     }
 
     /// Stop is guaranteed to be called at the end if start was called.
     fn stop(&mut self, _cx: &Context<Self>, _rx: &mut Self::Rx, _tx: &mut Self::Tx) -> Outcome {
-        SUCCESS
+        SKIPPED
     }
 
     /// Step is executed periodically after the codelet is started and while it is not paused.
     fn step(&mut self, _cx: &Context<Self>, _rx: &mut Self::Rx, _tx: &mut Self::Tx) -> Outcome {
-        SUCCESS
+        SKIPPED
     }
 
     /// Pause may be called to suspend stepping.
     fn pause(&mut self) -> Outcome {
-        SUCCESS
+        SKIPPED
     }
 
     /// Resume is called to resume stepping. Note that stop may also be called while the codelet
     /// is paused to stop the codelet completely instead of resuming stepping.
     fn resume(&mut self) -> Outcome {
-        SUCCESS
+        SKIPPED
     }
 }
 

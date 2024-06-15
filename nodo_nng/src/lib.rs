@@ -220,7 +220,7 @@ mod tests {
                 if *rx_counter.read().unwrap() == MESSAGE_COUNT {
                     ctrl.send(RuntimeControl::RequestStop)?;
                 }
-                Ok(())
+                SUCCESS
             })
             .into_instance("check", ())
         };

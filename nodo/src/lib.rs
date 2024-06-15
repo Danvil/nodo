@@ -23,10 +23,14 @@ pub mod prelude {
     pub use nodo_core::Acqtime;
     pub use nodo_core::Message;
     pub use nodo_core::Outcome;
+    pub use nodo_core::OutcomeKind;
     pub use nodo_core::Pubtime;
     pub use nodo_core::Stamp;
     pub use nodo_core::WithAcqtime;
+    pub use nodo_core::RUNNING;
+    pub use nodo_core::SKIPPED;
     pub use nodo_core::SUCCESS;
+    pub use nodo_core::TERMINATED;
     pub use nodo_derive::RxBundleDerive;
     pub use nodo_derive::TxBundleDerive;
 }

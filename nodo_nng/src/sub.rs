@@ -80,12 +80,15 @@ impl Codelet for NngSub {
         // SAFETY: guaranteed by start
         let socket = self.socket.as_mut().unwrap();
 
+        let mut received_count = 0;
+
         loop {
             match socket.try_recv() {
                 Ok(buff) => match Self::parse(buff) {
                     Ok(msg) => {
                         tx.push(msg)?;
                         self.message_count += 1;
+                        received_count += 1;
                     }
                     Err(err) => {
                         log::error!("{err:?}");
@@ -98,7 +101,11 @@ impl Codelet for NngSub {
             }
         }
 
-        SUCCESS
+        if received_count > 0 {
+            SUCCESS
+        } else {
+            SKIPPED
+        }
     }
 }
 

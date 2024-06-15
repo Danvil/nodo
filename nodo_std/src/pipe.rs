@@ -49,14 +49,22 @@ where
             PipeConfig::OneToOne => {
                 if let Some(msg) = rx.try_pop() {
                     tx.push((self.callback)(msg))?;
+                    SUCCESS
+                } else {
+                    SKIPPED
                 }
             }
             PipeConfig::Dynamic => {
+                let skipped = rx.is_empty();
                 while let Some(msg) = rx.try_pop() {
                     tx.push((self.callback)(msg))?;
                 }
+                if skipped {
+                    SKIPPED
+                } else {
+                    SUCCESS
+                }
             }
         }
-        SUCCESS
     }
 }

@@ -1,7 +1,7 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::channels::{RxBundle, TxBundle};
-use crate::codelet::{Codelet, Context, TaskClock, Transition, SUCCESS};
+use crate::codelet::{Codelet, Context, TaskClock, Transition};
 use nodo_core::*;
 
 /// Named instance of a codelet with configuration and channel bundels
@@ -85,7 +85,7 @@ impl<C: Codelet> CodeletInstance<C> {
 
         self.rx.sync_all();
         self.clock.as_mut().unwrap().start();
-        self.state.start(
+        let outcome = self.state.start(
             &Context {
                 clock: &self.clock.as_ref().unwrap(),
                 config: &self.config,
@@ -95,16 +95,16 @@ impl<C: Codelet> CodeletInstance<C> {
         )?;
         self.tx.flush_all()?;
 
-        log::trace!("'{}' start end", self.name);
+        log::trace!("'{}' start end ({outcome:?})", self.name);
 
-        SUCCESS
+        Ok(outcome)
     }
 
     pub fn stop(&mut self) -> Outcome {
         profiling::scope!(&format!("{}_stop", self.name));
         log::trace!("'{}' stop begin", self.name);
         self.rx.sync_all();
-        self.state.stop(
+        let outcome = self.state.stop(
             &Context {
                 clock: &self.clock.as_ref().unwrap(),
                 config: &self.config,
@@ -113,8 +113,8 @@ impl<C: Codelet> CodeletInstance<C> {
             &mut self.tx,
         )?;
         self.tx.flush_all()?;
-        log::trace!("'{}' stop end", self.name);
-        SUCCESS
+        log::trace!("'{}' stop end ({outcome:?})", self.name);
+        Ok(outcome)
     }
 
     pub fn step(&mut self) -> Outcome {
@@ -122,7 +122,7 @@ impl<C: Codelet> CodeletInstance<C> {
         log::trace!("'{}' step begin", self.name);
         self.rx.sync_all();
         self.clock.as_mut().unwrap().step();
-        self.state.step(
+        let outcome = self.state.step(
             &Context {
                 clock: &self.clock.as_ref().unwrap(),
                 config: &self.config,
@@ -131,8 +131,8 @@ impl<C: Codelet> CodeletInstance<C> {
             &mut self.tx,
         )?;
         self.tx.flush_all()?;
-        log::trace!("'{}' step end", self.name);
-        SUCCESS
+        log::trace!("'{}' step end ({outcome:?})", self.name);
+        Ok(outcome)
     }
 
     pub fn pause(&mut self) -> Outcome {

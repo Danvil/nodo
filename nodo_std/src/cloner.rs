@@ -39,7 +39,7 @@ impl<T: Clone + Send + Sync> Codelet for Cloner<T> {
     fn step(&mut self, ctx: &Context<Self>, _: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
         if let Some(max_count) = self.max_count {
             if self.count >= max_count {
-                return SUCCESS;
+                return TERMINATED;
             }
         }
 

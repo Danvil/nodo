@@ -50,16 +50,20 @@ where
     }
 
     fn step(&mut self, cx: &Context<Self>, rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
-        while let Some(message) = rx.try_pop() {
-            tx.push(Message {
-                seq: message.seq,
-                stamp: Stamp {
-                    acqtime: message.stamp.acqtime,
-                    pubtime: cx.clock.step_time(),
-                },
-                value: self.format.deserialize(message.value)?,
-            })?;
+        if rx.is_empty() {
+            SKIPPED
+        } else {
+            while let Some(message) = rx.try_pop() {
+                tx.push(Message {
+                    seq: message.seq,
+                    stamp: Stamp {
+                        acqtime: message.stamp.acqtime,
+                        pubtime: cx.clock.step_time(),
+                    },
+                    value: self.format.deserialize(message.value)?,
+                })?;
+            }
+            SUCCESS
         }
-        SUCCESS
     }
 }

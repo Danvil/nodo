@@ -4,6 +4,7 @@ use crate::codelet::CodeletExec;
 use crate::codelet::Transition;
 use core::fmt::Debug;
 use core::fmt::Formatter;
+use nodo_core::OutcomeKind;
 use nodo_core::Report;
 
 /// Possible states of codelets
@@ -75,12 +76,12 @@ impl<C: CodeletExec> StateMachine<C> {
         self.state.transition(request).is_some()
     }
 
-    pub fn transition(&mut self, transition: Transition) -> Result<(), TransitionError> {
+    pub fn transition(&mut self, transition: Transition) -> Result<OutcomeKind, TransitionError> {
         if let Some(next_state) = self.state.transition(transition) {
             match self.inner.execute(transition) {
-                Ok(()) => {
+                Ok(kind) => {
                     self.state = next_state;
-                    return Ok(());
+                    return Ok(kind);
                 }
                 Err(err) => {
                     self.has_error = true;

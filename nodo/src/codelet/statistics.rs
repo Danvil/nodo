@@ -15,6 +15,7 @@ pub struct Statistics {
 pub struct TransitionStatistics {
     pub duration: CountTotal,
     pub period: CountTotal,
+    pub skipped_count: u64,
     last_exec_begin: Option<Instant>,
 }
 
@@ -37,8 +38,9 @@ impl TransitionStatistics {
     pub fn new() -> Self {
         Self {
             duration: CountTotal::default(),
-            last_exec_begin: None,
             period: CountTotal::default(),
+            skipped_count: 0,
+            last_exec_begin: None,
         }
     }
 
@@ -52,13 +54,17 @@ impl TransitionStatistics {
         self.last_exec_begin = Some(now);
     }
 
-    pub fn end(&mut self) {
-        self.duration.push(
-            Instant::now()
-                - self
-                    .last_exec_begin
-                    .expect("end() must be called after begin()"),
-        );
+    pub fn end(&mut self, skipped: bool) {
+        if skipped {
+            self.skipped_count += 1;
+        } else {
+            self.duration.push(
+                Instant::now()
+                    - self
+                        .last_exec_begin
+                        .expect("end() must be called after begin()"),
+            );
+        }
     }
 }
 
@@ -103,56 +109,73 @@ impl CountTotal {
 }
 
 pub fn statistics_pretty_print(stats: HashMap<(String, String), Statistics>) {
+    let mut vec = stats.iter().collect::<Vec<_>>();
+    vec.sort_by_key(|(_, stats)| {
+        stats.transitions[Transition::Step]
+            .duration
+            .total
+            .as_nanos()
+    });
+
     println!("");
-    println!("+--------------------------+----------------------------------+--------+----------------------+----------------------+--------+---------+");
-    println!("| NAME                     | TYPE                             | STEP     Duration               Period               | START            |");
-    println!("|                          |                                  | Count  | (min-avg-max) [ms]   | (min-avg-max) [ms]   | Count  |  D [ms] |");
-    println!("+--------------------------+----------------------------------+--------+----------------------+----------------------+--------+---------+");
-    for ((tag, typename), stats) in stats.iter() {
+    println!("+--------------------------+----------------------------------+--------+--------+----------------------+-------+----------------------+--------+---------+");
+    println!("| NAME                     | TYPE                             | STEP              Duration                       Period               | START            |");
+    println!("|                          |                                  | Skipped| Count  | (min-avg-max) [ms]   | Total | (min-avg-max) [ms]   | Count  |  D [ms] |");
+    println!("+--------------------------+----------------------------------+--------+--------+----------------------+-------+----------------------+--------+---------+");
+    for ((tag, typename), stats) in vec.into_iter().rev() {
         println!(
-            "| {:024} | {:032} | {:6} | {}-{}-{} | {}-{}-{} | {:6} | {} |",
+            "| {:024} | {:032} | {:6} | {:6} | {} {} {} |{} | {} {} {} | {:2} /{:2} | {} |",
             cut_middle(tag, 24),
             cut_middle(typename, 32),
+            stats.transitions[Transition::Step].skipped_count,
             stats.transitions[Transition::Step].duration.count(),
             stats.transitions[Transition::Step]
                 .duration
                 .min_ms()
-                .map(|dt| format!("{:->6.2}", dt))
-                .unwrap_or("N/A".to_string()),
+                .map(|dt| format!("{:>6.2}", dt))
+                .unwrap_or("------".to_string()),
             stats.transitions[Transition::Step]
                 .duration
                 .average_ms()
-                .map(|dt| format!("{:->6.2}", dt))
-                .unwrap_or("N/A".to_string()),
+                .map(|dt| format!("{:>6.2}", dt))
+                .unwrap_or("------".to_string()),
             stats.transitions[Transition::Step]
                 .duration
                 .max_ms()
-                .map(|dt| format!("{:->6.2}", dt))
-                .unwrap_or("N/A".to_string()),
+                .map(|dt| format!("{:>6.2}", dt))
+                .unwrap_or("------".to_string()),
+            format!(
+                "{:>6.2}",
+                stats.transitions[Transition::Step]
+                    .duration
+                    .total
+                    .as_secs_f32()
+            ),
             stats.transitions[Transition::Step]
                 .period
                 .min_ms()
-                .map(|dt| format!("{:->6.2}", dt))
-                .unwrap_or("N/A".to_string()),
+                .map(|dt| format!("{:>6.2}", dt))
+                .unwrap_or("------".to_string()),
             stats.transitions[Transition::Step]
                 .period
                 .average_ms()
-                .map(|dt| format!("{:->6.2}", dt))
-                .unwrap_or("N/A".to_string()),
+                .map(|dt| format!("{:>6.2}", dt))
+                .unwrap_or("------".to_string()),
             stats.transitions[Transition::Step]
                 .period
                 .max_ms()
-                .map(|dt| format!("{:->6.2}", dt))
-                .unwrap_or("N/A".to_string()),
+                .map(|dt| format!("{:>6.2}", dt))
+                .unwrap_or("------".to_string()),
+            stats.transitions[Transition::Start].skipped_count,
             stats.transitions[Transition::Start].duration.count(),
             stats.transitions[Transition::Start]
                 .duration
                 .average_ms()
                 .map(|dt| format!("{:>7.2}", dt))
-                .unwrap_or("N/A".to_string()),
+                .unwrap_or("-------".to_string()),
         );
     }
-    println!("+--------------------------+----------------------------------+--------+----------------------+----------------------+--------+---------+");
+    println!("+--------------------------+----------------------------------+--------+--------+----------------------+-------+----------------------+--------+---------+");
 }
 
 fn cut_middle(text: &String, len: usize) -> String {
