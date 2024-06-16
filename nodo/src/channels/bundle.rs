@@ -1,13 +1,14 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::channels::FlushError;
+use crate::channels::FlushResult;
+use crate::channels::SyncResult;
 use crate::channels::MAX_RECEIVER_COUNT;
 use paste::paste;
 
 /// An endpoint receiving data
 pub trait Rx: Send {
     /// Prepares receiving of messages
-    fn sync(&mut self);
+    fn sync(&mut self) -> SyncResult;
 
     /// Returns true if the channel is connected
     fn is_connected(&self) -> bool;
@@ -16,7 +17,7 @@ pub trait Rx: Send {
 /// An endpoint publishing data
 pub trait Tx: Send {
     /// Finalizes sending of messages
-    fn flush(&mut self) -> Result<(), FlushError>;
+    fn flush(&mut self) -> FlushResult;
 
     /// Returns true if the channel is connected
     fn is_connected(&self) -> bool;
@@ -25,11 +26,14 @@ pub trait Tx: Send {
 /// A collection of receiving endpoints. Synchronizing the bundle will synchronize all endpoints it
 /// contains.
 pub trait RxBundle: Send {
+    /// Number of channels
+    fn len(&self) -> usize;
+
     /// Name of the i-th endpoint
     fn name(&self, index: usize) -> String;
 
     /// Synchronizes all endpoints
-    fn sync_all(&mut self);
+    fn sync_all(&mut self, result: &mut [SyncResult]);
 
     /// Connection status of all endpoints in the budle
     fn check_connection(&self) -> ConnectionCheck;
@@ -38,25 +42,18 @@ pub trait RxBundle: Send {
 /// A collection of transmitting endpoints. Flushing the bundle will flush all endpoints it
 /// contains.
 pub trait TxBundle: Send {
+    /// Number of channels
+    fn len(&self) -> usize;
+
     /// Name of the i-th endpoint
     fn name(&self, index: usize) -> String;
 
     /// Flushes all endpoints
-    fn flush_all(&mut self) -> Result<(), MultiFlushError>;
+    fn flush_all(&mut self, results: &mut [FlushResult]);
 
     /// Connection status of all endpoints in the budle
     fn check_connection(&self) -> ConnectionCheck;
 }
-
-#[derive(Debug, thiserror::Error)]
-#[error("MultiFlushError({:?})", self.0)]
-pub struct MultiFlushError(pub Vec<(usize, FlushError)>);
-
-// impl From<FlushError> for MultiFlushError {
-//     fn from(error: FlushError) -> Self {
-//         MultiFlushError(vec![(0, error)])
-//     }
-// }
 
 macro_rules! count {
     () => (0usize);
@@ -64,11 +61,15 @@ macro_rules! count {
 }
 
 impl RxBundle for () {
+    fn len(&self) -> usize {
+        0
+    }
+
     fn name(&self, _index: usize) -> String {
         panic!("empty bundle")
     }
 
-    fn sync_all(&mut self) {}
+    fn sync_all(&mut self, _: &mut [SyncResult]) {}
 
     fn check_connection(&self) -> ConnectionCheck {
         ConnectionCheck::default()
@@ -78,14 +79,18 @@ impl RxBundle for () {
 macro_rules! impl_rx_bundle_tuple {
     ( $( $ty: ident, $i: literal ),* ) => {
         impl<$($ty),*> RxBundle for ($($ty,)*) where $($ty: Rx,)* {
+            fn len(&self) -> usize {
+                count!($($ty)*)
+            }
+
             fn name(&self, index: usize) -> String {
                 let len = count!($($ty)*);
                 assert!(index < len);
                 format!("{index}")
             }
 
-            fn sync_all(&mut self) {
-                $(paste!{self.$i}.sync();)*
+            fn sync_all(&mut self, results: &mut [SyncResult]) {
+                $(results[$i] = paste!{self.$i}.sync();)*
             }
 
             fn check_connection(&self) -> ConnectionCheck {
@@ -108,13 +113,15 @@ impl_rx_bundle_tuple!(A, 0, B, 1, C, 2, D, 3, E, 4, F, 5, G, 6);
 impl_rx_bundle_tuple!(A, 0, B, 1, C, 2, D, 3, E, 4, F, 5, G, 6, H, 7);
 
 impl TxBundle for () {
+    fn len(&self) -> usize {
+        0
+    }
+
     fn name(&self, _index: usize) -> String {
         panic!("empty bundle")
     }
 
-    fn flush_all(&mut self) -> Result<(), MultiFlushError> {
-        Ok(())
-    }
+    fn flush_all(&mut self, _results: &mut [FlushResult]) {}
 
     fn check_connection(&self) -> ConnectionCheck {
         ConnectionCheck::default()
@@ -124,29 +131,18 @@ impl TxBundle for () {
 macro_rules! impl_tx_bundle_tuple {
     ( $( $ty: ident, $i: literal ),* ) => {
         impl<$($ty),*> TxBundle for ($($ty,)*) where $($ty: Tx,)* {
+            fn len(&self) -> usize {
+                count!($($ty)*)
+            }
+
             fn name(&self, index: usize) -> String {
                 let len = count!($($ty)*);
                 assert!(index < len);
                 format!("{index}")
             }
 
-            fn flush_all(&mut self) -> Result<(), MultiFlushError> {
-                let errs: Vec<(usize, FlushError)> = [$(paste!{self.$i}.flush(),)*]
-                    .into_iter()
-                    .enumerate()
-                    .filter_map(|(i, res)| {
-                        if let Some(err) = res.err() {
-                            Some((i, err))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                if errs.is_empty() {
-                    Ok(())
-                } else {
-                    Err(MultiFlushError(errs))
-                }
+            fn flush_all(&mut self, results: &mut [FlushResult]) {
+                $(results[$i] = paste!{self.$i}.flush();)*
             }
 
             fn check_connection(&self) -> ConnectionCheck {

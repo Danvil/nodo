@@ -3,7 +3,9 @@
 use core::marker::PhantomData;
 use nodo::channels::DoubleBufferRx;
 use nodo::channels::DoubleBufferTx;
+use nodo::channels::FlushResult;
 use nodo::channels::Pop;
+use nodo::channels::SyncResult;
 use nodo::channels::{Rx, Tx};
 use nodo::codelet::Codelet;
 use nodo::codelet::Context;
@@ -69,6 +71,10 @@ impl<T> MultiplexerRx<T> {
 }
 
 impl<T: Send + Sync> nodo::channels::RxBundle for MultiplexerRx<T> {
+    fn len(&self) -> usize {
+        self.inputs.len() + 1
+    }
+
     fn name(&self, index: usize) -> String {
         if index < self.inputs.len() {
             format!("{index}")
@@ -82,11 +88,11 @@ impl<T: Send + Sync> nodo::channels::RxBundle for MultiplexerRx<T> {
         }
     }
 
-    fn sync_all(&mut self) {
-        for channel in self.inputs.iter_mut() {
-            channel.sync();
+    fn sync_all(&mut self, results: &mut [SyncResult]) {
+        for (i, channel) in self.inputs.iter_mut().enumerate() {
+            results[i] = channel.sync();
         }
-        self.selection.sync();
+        results[results.len() - 1] = self.selection.sync();
     }
 
     fn check_connection(&self) -> nodo::channels::ConnectionCheck {
@@ -104,17 +110,17 @@ pub struct MultiplexerTx<T> {
 }
 
 impl<T: Send + Sync + Clone> nodo::channels::TxBundle for MultiplexerTx<T> {
+    fn len(&self) -> usize {
+        1
+    }
+
     fn name(&self, index: usize) -> String {
-        if index != 0 {
-            panic!("index must be 0");
-        }
+        assert_eq!(index, 0);
         "output".to_string()
     }
 
-    fn flush_all(&mut self) -> Result<(), nodo::channels::MultiFlushError> {
-        self.output
-            .flush()
-            .map_err(|e| nodo::channels::MultiFlushError(vec![(0, e)]))
+    fn flush_all(&mut self, results: &mut [FlushResult]) {
+        results[0] = self.output.flush();
     }
 
     fn check_connection(&self) -> nodo::channels::ConnectionCheck {

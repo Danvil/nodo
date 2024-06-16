@@ -1,8 +1,7 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use core::marker::PhantomData;
-use nodo::channels::FlushError;
-use nodo::channels::MultiFlushError;
+use nodo::channels::FlushResult;
 use nodo::codelet::Context;
 use nodo::prelude::*;
 use nodo_core::Topic;
@@ -74,28 +73,18 @@ impl<T> TopicSplitTx<T> {
 }
 
 impl<T: Send + Sync + Clone> nodo::channels::TxBundle for TopicSplitTx<T> {
+    fn len(&self) -> usize {
+        self.channels.len()
+    }
+
     fn name(&self, index: usize) -> String {
         (&self.channels[index].0).into()
     }
 
-    fn flush_all(&mut self) -> Result<(), nodo::channels::MultiFlushError> {
-        let errs: Vec<(usize, FlushError)> = self
-            .channels
-            .iter_mut()
-            .map(|(_, tx)| tx.flush())
-            .enumerate()
-            .filter_map(|(i, res)| {
-                if let Some(err) = res.err() {
-                    Some((i, err))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        if errs.is_empty() {
-            Ok(())
-        } else {
-            Err(MultiFlushError(errs))
+    fn flush_all(&mut self, result: &mut [FlushResult]) {
+        assert_eq!(result.len(), self.channels.len());
+        for i in 0..self.channels.len() {
+            result[i] = self.channels[i].1.flush();
         }
     }
 

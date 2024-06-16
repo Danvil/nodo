@@ -4,6 +4,7 @@ use core::marker::PhantomData;
 use nodo::channels::DoubleBufferRx;
 use nodo::channels::DoubleBufferTx;
 use nodo::channels::Rx;
+use nodo::channels::SyncResult;
 use nodo::codelet::Codelet;
 use nodo::codelet::Context;
 use nodo_core::Outcome;
@@ -17,15 +18,11 @@ pub struct JoinConfig {
 /// Join has multiple input channels and a single output channel. All messages received on any
 /// input channel are sent to the output channel. There is no particular guarantee on the order
 /// of messages on the output channel.
-pub struct Join<T> {
-    marker: PhantomData<T>,
-}
+pub struct Join<T>(PhantomData<T>);
 
 impl<T: Send + Sync + Clone> Default for Join<T> {
     fn default() -> Self {
-        Self {
-            marker: PhantomData::default(),
-        }
+        Self(PhantomData)
     }
 }
 
@@ -75,6 +72,10 @@ impl<T> JoinRx<T> {
 }
 
 impl<T: Send + Sync> nodo::channels::RxBundle for JoinRx<T> {
+    fn len(&self) -> usize {
+        self.inputs.len()
+    }
+
     fn name(&self, index: usize) -> String {
         if index < self.inputs.len() {
             format!("input_{index}")
@@ -86,9 +87,9 @@ impl<T: Send + Sync> nodo::channels::RxBundle for JoinRx<T> {
         }
     }
 
-    fn sync_all(&mut self) {
-        for channel in self.inputs.iter_mut() {
-            channel.sync()
+    fn sync_all(&mut self, results: &mut [SyncResult]) {
+        for (i, channel) in self.inputs.iter_mut().enumerate() {
+            results[i] = channel.sync()
         }
     }
 

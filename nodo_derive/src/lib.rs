@@ -36,6 +36,10 @@ fn impl_rx_bundle_derive(input: &syn::DeriveInput) -> TokenStream {
 
     let gen = quote! {
         impl #impl_generics nodo::channels::RxBundle for #name #type_generics #where_clause {
+            fn len(&self) -> usize {
+                #fields_count
+            }
+
             fn name(&self, index: usize) -> String {
                 match index {
                     #(#field_index => (#field_name_str).to_string(),)*
@@ -43,10 +47,10 @@ fn impl_rx_bundle_derive(input: &syn::DeriveInput) -> TokenStream {
                 }
             }
 
-            fn sync_all(&mut self) {
+            fn sync_all(&mut self, results: &mut [nodo::channels::SyncResult]) {
                 use nodo::channels::Rx;
 
-                #(self.#field_name.sync();)*
+                #(results[#field_index] = self.#field_name.sync();)*
             }
 
             fn check_connection(&self) -> nodo::channels::ConnectionCheck {
@@ -91,6 +95,10 @@ fn impl_tx_bundle_derive(input: &syn::DeriveInput) -> TokenStream {
 
     let gen = quote! {
         impl #impl_generics nodo::channels::TxBundle for #name #type_generics #where_clause {
+            fn len(&self) -> usize {
+                #fields_count
+            }
+
             fn name(&self, index: usize) -> String {
                 match index {
                     #(#field_index => (#field_name_str).to_string(),)*
@@ -98,21 +106,10 @@ fn impl_tx_bundle_derive(input: &syn::DeriveInput) -> TokenStream {
                 }
             }
 
-            fn flush_all(&mut self) -> Result<(), nodo::channels::MultiFlushError> {
+            fn flush_all(&mut self, results: &mut [nodo::channels::FlushResult]) {
                 use nodo::channels::Tx;
 
-                let mut errs = Vec::new();
-                #(
-                    match self.#field_name.flush() {
-                        Ok(()) => {},
-                        Err(err) => errs.push((#field_index, err)),
-                    }
-                )*
-                if errs.is_empty() {
-                    Ok(())
-                } else {
-                    Err(nodo::channels::MultiFlushError(errs))
-                }
+                #(results[#field_index] = self.#field_name.flush();)*
             }
 
             fn check_connection(&self) -> nodo::channels::ConnectionCheck {

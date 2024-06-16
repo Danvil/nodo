@@ -2,16 +2,15 @@
 
 use crate::channels::BackStage;
 use crate::channels::ConnectionCheck;
+use crate::channels::FlushResult;
 use crate::channels::FrontStage;
-use crate::channels::MultiFlushError;
 use crate::channels::OverflowPolicy;
 use crate::channels::RxBundle;
 use crate::channels::RxChannelTimeseries;
-use crate::channels::StrictlyIncreasingLinear;
+use crate::channels::SyncResult;
 use crate::channels::TxBundle;
 use crate::channels::{Rx, Tx};
 use crate::prelude::RetentionPolicy;
-use core::num::NonZeroU64;
 use core::ops;
 use nodo_core::Message;
 use nodo_core::TimestampKind;
@@ -19,16 +18,6 @@ use std::collections::vec_deque;
 use std::fmt;
 use std::sync::Arc;
 use std::sync::RwLock;
-
-/// Creates a new double-buffered SP-MC (single producer, multiple consumer) with fixed capacity.
-pub fn fixed_channel<T: Clone + Send + Sync>(
-    size: usize,
-) -> (DoubleBufferTx<T>, DoubleBufferRx<T>) {
-    let mut tx = DoubleBufferTx::new(size);
-    let mut rx = DoubleBufferRx::new(OverflowPolicy::Reject(size), RetentionPolicy::Keep);
-    tx.connect(&mut rx).unwrap();
-    (tx, rx)
-}
 
 /// The maximum number of receivers which can be connected to a single transmitter. This is a
 /// technical limitation as some error codes use 64-bit bitmasks.
@@ -77,10 +66,7 @@ impl<T> DoubleBufferTx<T> {
     /// better to use a fixed capacity or to forget old messages.
     pub fn new_auto_size() -> Self {
         Self {
-            outbox: BackStage::new(
-                OverflowPolicy::Resize(StrictlyIncreasingLinear::from_factor(2)),
-                RetentionPolicy::Drop,
-            ),
+            outbox: BackStage::new(OverflowPolicy::Resize, RetentionPolicy::Drop),
             connections: Vec::new(),
         }
     }
@@ -116,7 +102,7 @@ impl<T> DoubleBufferTx<T> {
             return Err(TxConnectError::MaxConnectionCountExceeded);
         }
 
-        if matches!(self.outbox.overflow_policy(), OverflowPolicy::Resize(_))
+        if matches!(self.outbox.overflow_policy(), OverflowPolicy::Resize)
             && matches!(
                 rx.back.read().unwrap().overflow_policy(),
                 OverflowPolicy::Reject(_)
@@ -148,17 +134,20 @@ pub enum TxConnectError {
 }
 
 impl<T: Send + Sync + Clone> Tx for DoubleBufferTx<T> {
-    fn flush(&mut self) -> Result<(), FlushError> {
-        let mut result = FlushResult::new();
+    fn flush(&mut self) -> FlushResult {
+        let mut result = FlushResult::default();
+        result.available = self.outbox.len();
 
         // clone messages for connections 2..N
         for (i, rx) in self.connections.iter().enumerate().skip(1) {
             let mut q = rx.write().unwrap();
             for v in self.outbox.iter() {
                 if matches!(q.push((*v).clone()), Err(_)) {
-                    result.mark(i);
+                    result.error_indicator.mark(i);
                     break;
                 }
+                result.cloned += 1;
+                result.published += 1;
             }
         }
 
@@ -167,16 +156,17 @@ impl<T: Send + Sync + Clone> Tx for DoubleBufferTx<T> {
             let mut q = first_rx.write().unwrap();
             for v in self.outbox.drain_all() {
                 if matches!(q.push(v), Err(_)) {
-                    result.mark(0);
+                    result.error_indicator.mark(0);
                     break;
                 }
+                result.published += 1;
             }
         } else {
             // still clear outbox if there is no connection
             self.outbox.clear();
         }
 
-        result.into()
+        result
     }
 
     fn is_connected(&self) -> bool {
@@ -185,11 +175,11 @@ impl<T: Send + Sync + Clone> Tx for DoubleBufferTx<T> {
 }
 
 impl<T: Send + Sync + Clone> Tx for Option<DoubleBufferTx<T>> {
-    fn flush(&mut self) -> Result<(), FlushError> {
+    fn flush(&mut self) -> FlushResult {
         if let Some(tx) = self.as_mut() {
             tx.flush()
         } else {
-            Ok(())
+            FlushResult::ZERO
         }
     }
 
@@ -199,13 +189,17 @@ impl<T: Send + Sync + Clone> Tx for Option<DoubleBufferTx<T>> {
 }
 
 impl<T: Send + Sync + Clone> TxBundle for DoubleBufferTx<T> {
+    fn len(&self) -> usize {
+        1
+    }
+
     fn name(&self, index: usize) -> String {
         assert_eq!(index, 0);
         String::from("out")
     }
 
-    fn flush_all(&mut self) -> Result<(), MultiFlushError> {
-        self.flush().map_err(|fe| MultiFlushError(vec![(0, fe)]))
+    fn flush_all(&mut self, result: &mut [FlushResult]) {
+        result[0] = self.flush();
     }
 
     fn check_connection(&self) -> ConnectionCheck {
@@ -216,70 +210,23 @@ impl<T: Send + Sync + Clone> TxBundle for DoubleBufferTx<T> {
 }
 
 impl<T: Send + Sync + Clone> TxBundle for Option<DoubleBufferTx<T>> {
+    fn len(&self) -> usize {
+        1
+    }
+
     fn name(&self, index: usize) -> String {
         assert_eq!(index, 0);
         String::from("out")
     }
 
-    fn flush_all(&mut self) -> Result<(), MultiFlushError> {
-        if let Some(tx) = self.as_mut() {
-            tx.flush().map_err(|fe| MultiFlushError(vec![(0, fe)]))
-        } else {
-            Ok(())
-        }
+    fn flush_all(&mut self, result: &mut [FlushResult]) {
+        result[0] = self.flush();
     }
 
     fn check_connection(&self) -> ConnectionCheck {
         let mut cc = ConnectionCheck::new(1);
         cc.mark(0, self.as_ref().map_or(false, |tx| tx.is_connected()));
         cc
-    }
-}
-
-#[derive(Debug)]
-pub struct FlushError {
-    marks: NonZeroU64,
-}
-
-impl FlushError {
-    pub fn new(marks: NonZeroU64) -> Self {
-        Self { marks }
-    }
-
-    pub fn has_err(&self, i: usize) -> bool {
-        (self.marks.get() & (1 << i)) != 0
-    }
-}
-
-impl From<FlushResult> for Result<(), FlushError> {
-    fn from(value: FlushResult) -> Result<(), FlushError> {
-        match NonZeroU64::new(value.marks) {
-            Some(marks) => Err(FlushError::new(marks)),
-            None => Ok(()),
-        }
-    }
-}
-
-impl fmt::Display for FlushError {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(fmt, "FlushError({:b})", self.marks)
-    }
-}
-
-impl std::error::Error for FlushError {}
-
-#[derive(Debug)]
-struct FlushResult {
-    marks: u64,
-}
-
-impl FlushResult {
-    pub fn new() -> Self {
-        Self { marks: 0 }
-    }
-
-    pub fn mark(&mut self, i: usize) {
-        self.marks &= 1 << i;
     }
 }
 
@@ -306,10 +253,7 @@ impl<T> DoubleBufferRx<T> {
     /// WARNING: This might lead to data congestion and infinitely growing queues. Usually it is
     /// better to use a fixed capacity or to forget old messages.
     pub fn new_auto_size() -> Self {
-        Self::new(
-            OverflowPolicy::Resize(StrictlyIncreasingLinear::from_factor(2)),
-            RetentionPolicy::Drop,
-        )
+        Self::new(OverflowPolicy::Resize, RetentionPolicy::Drop)
     }
 
     pub fn pop_all(&mut self) -> std::collections::vec_deque::Drain<'_, T> {
@@ -328,7 +272,7 @@ impl<T> DoubleBufferRx<T> {
         // SAFETY FIXME
         match self.back.read().unwrap().overflow_policy() {
             OverflowPolicy::Reject(n) | OverflowPolicy::Forget(n) => self.front.len() == *n,
-            OverflowPolicy::Resize(_) => false,
+            OverflowPolicy::Resize => false,
         }
     }
 
@@ -456,8 +400,8 @@ impl<T: Send + Sync> Rx for DoubleBufferRx<T> {
         self.is_connected
     }
 
-    fn sync(&mut self) {
-        self.back.write().unwrap().sync(&mut self.front);
+    fn sync(&mut self) -> SyncResult {
+        self.back.write().unwrap().sync(&mut self.front)
     }
 }
 
@@ -466,21 +410,23 @@ impl<T: Send + Sync> Rx for Option<DoubleBufferRx<T>> {
         self.as_ref().map_or(false, |rx| rx.is_connected)
     }
 
-    fn sync(&mut self) {
-        if let Some(rx) = self.as_mut() {
-            rx.sync()
-        }
+    fn sync(&mut self) -> SyncResult {
+        self.as_mut().map_or(SyncResult::ZERO, |rx| rx.sync())
     }
 }
 
 impl<T: Send + Sync> RxBundle for DoubleBufferRx<T> {
+    fn len(&self) -> usize {
+        1
+    }
+
     fn name(&self, index: usize) -> String {
         assert_eq!(index, 0);
         String::from("in")
     }
 
-    fn sync_all(&mut self) {
-        self.sync()
+    fn sync_all(&mut self, results: &mut [SyncResult]) {
+        results[0] = self.sync();
     }
 
     fn check_connection(&self) -> ConnectionCheck {
@@ -491,15 +437,17 @@ impl<T: Send + Sync> RxBundle for DoubleBufferRx<T> {
 }
 
 impl<T: Send + Sync> RxBundle for Option<DoubleBufferRx<T>> {
+    fn len(&self) -> usize {
+        1
+    }
+
     fn name(&self, index: usize) -> String {
         assert_eq!(index, 0);
         String::from("in")
     }
 
-    fn sync_all(&mut self) {
-        if let Some(rx) = self.as_mut() {
-            rx.sync()
-        }
+    fn sync_all(&mut self, results: &mut [SyncResult]) {
+        results[0] = self.as_mut().map_or(SyncResult::ZERO, |rx| rx.sync());
     }
 
     fn check_connection(&self) -> ConnectionCheck {
@@ -541,9 +489,20 @@ impl std::error::Error for RxRecvError {}
 
 #[cfg(test)]
 mod tests {
-    use crate::channels::double_buffer_channel::fixed_channel;
+    use crate::channels::FlushResult;
+    use crate::channels::SyncResult;
     use crate::prelude::*;
     use std::sync::mpsc;
+
+    fn fixed_channel<T: Clone + Send + Sync>(
+        size: usize,
+    ) -> (DoubleBufferTx<T>, DoubleBufferRx<T>) {
+        let mut tx = DoubleBufferTx::new(size);
+        let mut rx =
+            DoubleBufferRx::new(OverflowPolicy::Reject(size), RetentionPolicy::EnforceEmpty);
+        tx.connect(&mut rx).unwrap();
+        (tx, rx)
+    }
 
     #[test]
     fn test() {
@@ -561,7 +520,15 @@ mod tests {
             for k in 0..NUM_ROUNDS {
                 // wait for signal to sync
                 sync_rx.recv().unwrap();
-                rx.sync();
+
+                assert_eq!(
+                    rx.sync(),
+                    SyncResult {
+                        received: NUM_MESSAGES,
+                        ..Default::default()
+                    }
+                );
+
                 rep_tx.send(()).unwrap();
 
                 // receive messages
@@ -578,7 +545,14 @@ mod tests {
                 for i in 0..NUM_MESSAGES {
                     tx.push(format!("hello {k} {i}")).unwrap();
                 }
-                tx.flush().unwrap();
+                assert_eq!(
+                    tx.flush(),
+                    FlushResult {
+                        available: NUM_MESSAGES,
+                        published: NUM_MESSAGES,
+                        ..Default::default()
+                    }
+                );
 
                 // send sync signal
                 sync_tx.send(()).unwrap();

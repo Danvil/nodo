@@ -3,6 +3,7 @@
 use core::marker::PhantomData;
 use nodo::channels::Rx;
 use nodo::channels::RxBundle;
+use nodo::channels::SyncResult;
 use nodo::codelet::Context;
 use nodo::prelude::*;
 use nodo_core::Topic;
@@ -81,6 +82,10 @@ impl<T> TopicJoinRx<T> {
 }
 
 impl<T: Send + Sync> RxBundle for TopicJoinRx<T> {
+    fn len(&self) -> usize {
+        self.channels.len()
+    }
+
     fn name(&self, index: usize) -> String {
         if index < self.channels.len() {
             format!("input_{index}")
@@ -92,9 +97,9 @@ impl<T: Send + Sync> RxBundle for TopicJoinRx<T> {
         }
     }
 
-    fn sync_all(&mut self) {
-        for channel in self.channels.iter_mut() {
-            channel.1.sync()
+    fn sync_all(&mut self, results: &mut [SyncResult]) {
+        for (i, channel) in self.channels.iter_mut().enumerate() {
+            results[i] = channel.1.sync()
         }
     }
 

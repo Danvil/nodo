@@ -1,5 +1,6 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
+use crate::channels::SyncResult;
 use core::ops;
 use std::collections::vec_deque;
 use std::collections::VecDeque;
@@ -29,7 +30,7 @@ pub enum OverflowPolicy {
     /// Queue capacity is increased indefinitely to fit the new item. This is a dangerous policy
     /// as it can lead to unbound memory consumption. Consider to use the 'Forget' or 'Reject'
     /// policies instead.
-    Resize(StrictlyIncreasingLinear),
+    Resize,
 }
 
 /// Describes how leftover items in the front queue are handled when a new frame begins.
@@ -44,13 +45,6 @@ pub enum RetentionPolicy {
 
     /// The dev must drain all items out of the queue before the frame ends.
     EnforceEmpty,
-}
-
-/// A strictly increasing linear function of the form `f(x) = a*x + b`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct StrictlyIncreasingLinear {
-    addend: usize,
-    factor: usize,
 }
 
 impl<T> FrontStage<T> {
@@ -113,7 +107,7 @@ impl<T> BackStage<T> {
 
         let items = match overflow_policy {
             OverflowPolicy::Reject(n) | OverflowPolicy::Forget(n) => VecDeque::with_capacity(n),
-            OverflowPolicy::Resize(_) => VecDeque::new(),
+            OverflowPolicy::Resize => VecDeque::new(),
         };
 
         Self {
@@ -147,12 +141,7 @@ impl<T> BackStage<T> {
                     self.items.pop_front();
                 }
             }
-            OverflowPolicy::Resize(sil) => {
-                if self.items.len() == self.items.capacity() {
-                    let new_capacity = sil.eval(self.items.capacity());
-                    self.items.reserve_exact(new_capacity);
-                }
-            }
+            OverflowPolicy::Resize => {}
         }
 
         self.items.push_back(value);
@@ -161,7 +150,7 @@ impl<T> BackStage<T> {
     }
 
     /// Clears the front stage and moves all items from the backstage to the front stage
-    pub fn sync(&mut self, target: &mut FrontStage<T>) -> Result<(), SyncError> {
+    pub fn sync(&mut self, target: &mut FrontStage<T>) -> SyncResult {
         match self.retention_policy {
             RetentionPolicy::Keep => {
                 match self.overflow_policy {
@@ -172,10 +161,13 @@ impl<T> BackStage<T> {
                         assert!(current_count <= n);
 
                         let available_count = n - target.len();
-                        if available_count < incoming_count {
+                        let forgotten = if available_count < incoming_count {
                             let delta = incoming_count - available_count;
                             target.drain(0..delta);
-                        }
+                            delta
+                        } else {
+                            0
+                        };
 
                         target.items.append(&mut self.items);
 
@@ -184,30 +176,42 @@ impl<T> BackStage<T> {
                         assert_eq!(self.items.len(), 0);
                         assert_eq!(self.items.capacity(), n);
 
-                        Ok(())
+                        SyncResult {
+                            received: incoming_count,
+                            forgotten,
+                            ..Default::default()
+                        }
                     }
                     OverflowPolicy::Reject(_) => {
                         // SAFETY: This is checked in the constructor.
                         unreachable!();
                     }
-                    OverflowPolicy::Resize(_) => {
-                        // TODO use SIL
+                    OverflowPolicy::Resize => {
+                        let result = SyncResult {
+                            received: self.items.len(),
+                            ..Default::default()
+                        };
+
                         self.items.append(&mut target.items);
-                        Ok(())
+
+                        result
                     }
                 }
             }
-            RetentionPolicy::Drop => {
+            RetentionPolicy::Drop | RetentionPolicy::EnforceEmpty => {
+                let result = SyncResult {
+                    received: self.items.len(),
+                    dropped: target.items.len(),
+                    enforce_empty_violation: self.retention_policy == RetentionPolicy::EnforceEmpty
+                        && !target.items.is_empty(),
+                    ..Default::default()
+                };
+
                 target.items.clear();
+
                 std::mem::swap(&mut self.items, &mut target.items);
-                Ok(())
-            }
-            RetentionPolicy::EnforceEmpty => {
-                if !target.items.is_empty() {
-                    return Err(SyncError::NotEmpty);
-                }
-                std::mem::swap(&mut self.items, &mut target.items);
-                Ok(())
+
+                result
             }
         }
     }
@@ -230,59 +234,12 @@ pub enum PushError {
     Rejected,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SyncError {
-    NotEmpty,
-}
-
-impl StrictlyIncreasingLinear {
-    pub fn from_addend(addend: usize) -> Self {
-        Self::new(addend, 1)
-    }
-
-    pub fn from_factor(factor: usize) -> Self {
-        Self::new(0, factor)
-    }
-
-    pub fn new(addend: usize, factor: usize) -> Self {
-        match (addend, factor) {
-            (_, 0) => panic!("`factor` must not be 0."),
-            (0, 1) => panic!("If `addend` is 0, `factor` must be at least 2"),
-            (addend, factor) => Self { addend, factor },
-        }
-    }
-
-    /// Compute the next value. Will panic if the next value cannot be represented as a usize.
-    pub fn eval(&self, current: usize) -> usize {
-        let next = if current == 0 && self.addend == 0 {
-            1
-        } else {
-            current
-                .checked_mul(self.factor)
-                .unwrap()
-                .checked_add(self.addend)
-                .unwrap()
-        };
-
-        if next <= current {
-            unreachable!(
-                "next value not larger than current.
-                 current: {current}, addend: {}, factor: {}, next: {next}",
-                self.addend, self.factor
-            );
-        }
-
-        next
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::channels::BackStage;
     use crate::channels::FrontStage;
     use crate::channels::PushError;
-    use crate::channels::StrictlyIncreasingLinear;
-    use crate::channels::SyncError;
+    use crate::channels::SyncResult;
     use crate::prelude::*;
 
     pub struct StageQueue<T> {
@@ -306,7 +263,7 @@ mod tests {
             self.back.push(value)
         }
 
-        pub fn sync(&mut self) -> Result<(), SyncError> {
+        pub fn sync(&mut self) -> SyncResult {
             self.back.sync(&mut self.front)
         }
 
@@ -325,27 +282,36 @@ mod tests {
 
     #[test]
     fn test_push_resize() {
-        let mut sq = StageQueue::new(
-            1,
-            OverflowPolicy::Resize(StrictlyIncreasingLinear::from_factor(2)),
-        );
-        assert_eq!(sq.capacity(), 1);
+        let mut sq = StageQueue::new(1, OverflowPolicy::Resize);
+        assert_eq!(sq.capacity(), 0);
 
         assert_eq!(sq.push(31), Ok(()));
         assert_eq!(sq.push(42), Ok(()));
-        assert_eq!(sq.capacity(), 2);
 
         assert_eq!(sq.pop(), None);
-        sq.sync().unwrap();
+
+        assert_eq!(
+            sq.sync(),
+            SyncResult {
+                received: 2,
+                ..Default::default()
+            }
+        );
+
         assert_eq!(sq.pop(), Some(31));
         assert_eq!(sq.pop(), Some(42));
 
         assert_eq!(sq.push(53), Ok(()));
-        assert_eq!(sq.capacity(), 2);
         assert_eq!(sq.push(53), Ok(()));
-        assert_eq!(sq.capacity(), 2);
         assert_eq!(sq.push(53), Ok(()));
-        assert_eq!(sq.capacity(), 4);
+
+        assert_eq!(
+            sq.sync(),
+            SyncResult {
+                received: 3,
+                ..Default::default()
+            }
+        );
     }
 
     #[test]
@@ -358,7 +324,13 @@ mod tests {
         assert_eq!(sq.capacity(), 1);
 
         assert_eq!(sq.pop(), None);
-        sq.sync().unwrap();
+        assert_eq!(
+            sq.sync(),
+            SyncResult {
+                received: 1,
+                ..Default::default()
+            }
+        );
         assert_eq!(sq.pop(), Some(31));
         assert_eq!(sq.pop(), None);
 
@@ -376,58 +348,17 @@ mod tests {
         assert_eq!(sq.capacity(), 1);
 
         assert_eq!(sq.pop(), None);
-        sq.sync().unwrap();
+        assert_eq!(
+            sq.sync(),
+            SyncResult {
+                received: 1,
+                ..Default::default()
+            }
+        );
         assert_eq!(sq.pop(), Some(42));
         assert_eq!(sq.pop(), None);
 
         assert_eq!(sq.push(53), Ok(()));
         assert_eq!(sq.capacity(), 1);
-    }
-
-    #[test]
-    fn test_strictly_increasing_linear() {
-        test_strictly_increasing_linear_impl(StrictlyIncreasingLinear::from_addend(1));
-        test_strictly_increasing_linear_impl(StrictlyIncreasingLinear::from_factor(2));
-        test_strictly_increasing_linear_impl(StrictlyIncreasingLinear::new(2, 1));
-        test_strictly_increasing_linear_impl(StrictlyIncreasingLinear::new(1, 2));
-        test_strictly_increasing_linear_impl(StrictlyIncreasingLinear::new(2, 3));
-    }
-
-    fn test_strictly_increasing_linear_impl(f: StrictlyIncreasingLinear) {
-        let mut x = 0;
-        for _ in 0..10 {
-            let xn = f.eval(x);
-            assert!(xn > x);
-            x = xn;
-        }
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_strictly_increasing_linear_panic_2() {
-        test_strictly_increasing_linear_impl(StrictlyIncreasingLinear::from_addend(0));
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_strictly_increasing_linear_panic_1() {
-        test_strictly_increasing_linear_impl(StrictlyIncreasingLinear::from_factor(1));
-    }
-
-    #[test]
-    fn test_strictly_increasing_linear_addend_1() {
-        let sil = StrictlyIncreasingLinear::from_addend(1);
-        for i in 0..100 {
-            assert_eq!(sil.eval(i), i + 1);
-        }
-    }
-
-    #[test]
-    fn test_strictly_increasing_linear_factor_2() {
-        let sil = StrictlyIncreasingLinear::from_factor(2);
-        assert_eq!(sil.eval(0), 1);
-        for i in 1..100 {
-            assert_eq!(sil.eval(i), 2 * i);
-        }
     }
 }

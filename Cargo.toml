@@ -6,7 +6,8 @@ members = [
   "nodo_async",
   "nodo_core",
   "nodo_derive",
-  "nodo_json", "nodo_nng",
-  "nodo_record",
+  "nodo_json",
+  "nodo_nng",
+  # "nodo_record",
   "nodo_std",
 ]
