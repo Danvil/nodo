@@ -2,6 +2,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "examples",
   "nodo",
   "nodo_async",
   "nodo_core",

@@ -1,0 +1,13 @@
+[package]
+name = "examples"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eyre = "0.6"
+nodo = { path = "../nodo" }
+nodo_std = { path = "../nodo_std" }
+
+[[example]]
+name = "ping"
+path = "ping.rs"
