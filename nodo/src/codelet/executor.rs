@@ -4,13 +4,18 @@ use crate::codelet::ScheduleExecutor;
 use crate::codelet::Statistics;
 use crate::codelet::TaskClock;
 use crate::sleep::accurate_sleep_until;
+use core::time::Duration;
 use nodo_core::MonotonicClock;
 use nodo_core::PubtimeMarker;
 use std::collections::HashMap;
+use std::time::Instant;
+
+const REPORT_RATE: Duration = Duration::from_millis(1000);
 
 pub struct Executor {
     clock: MonotonicClock<PubtimeMarker>,
     workers: Vec<Worker>,
+    latest_report: Option<WorkerReport>,
 }
 
 pub struct Worker {
@@ -18,15 +23,16 @@ pub struct Worker {
     thread: Option<std::thread::JoinHandle<()>>,
     tx_request: std::sync::mpsc::Sender<WorkerRequest>,
     rx_reply: std::sync::mpsc::Receiver<WorkerReply>,
+    latest_report: Option<WorkerReport>,
 }
 
 pub enum WorkerRequest {
     Stop,
-    Statistics,
+    Report,
 }
 
 pub enum WorkerReply {
-    Statistics(HashMap<(String, String), Statistics>),
+    Report(WorkerReport),
 }
 
 pub struct WorkerState {
@@ -35,12 +41,39 @@ pub struct WorkerState {
     tx_reply: std::sync::mpsc::Sender<WorkerReply>,
 }
 
+impl WorkerState {
+    pub fn report(&self) -> WorkerReport {
+        WorkerReport {
+            statistics: self.schedule.statistics(),
+            codelets: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct WorkerReport {
+    pub statistics: HashMap<(String, String), Statistics>,
+    pub codelets: HashMap<String, ()>,
+}
+
+impl WorkerReport {
+    pub fn extend(&mut self, other: &WorkerReport) {
+        self.statistics.extend(other.statistics.clone());
+        self.codelets.extend(other.codelets.clone());
+    }
+}
+
 impl Executor {
     pub fn new() -> Self {
         Self {
             clock: MonotonicClock::new(),
             workers: Vec::new(),
+            latest_report: None,
         }
+    }
+
+    pub fn report(&self) -> Option<&WorkerReport> {
+        self.latest_report.as_ref()
     }
 
     pub fn push(&mut self, mut schedule: ScheduleExecutor) {
@@ -75,12 +108,18 @@ impl Executor {
         }
     }
 
-    pub fn statistics(&self) -> HashMap<(String, String), Statistics> {
-        let mut result = HashMap::new();
-        for w in self.workers.iter() {
-            result.extend(w.statistics());
+    pub fn step(&mut self) {
+        for w in self.workers.iter_mut() {
+            w.step();
         }
-        result
+
+        let mut result = WorkerReport::default();
+        for w in self.workers.iter() {
+            if let Some(report) = &w.latest_report {
+                result.extend(report);
+            }
+        }
+        self.latest_report = Some(result);
     }
 }
 
@@ -104,6 +143,7 @@ impl Worker {
             ),
             tx_request,
             rx_reply,
+            latest_report: None,
         }
     }
 
@@ -116,6 +156,8 @@ impl Worker {
     }
 
     fn worker_thread(mut state: WorkerState) {
+        let mut latest_report_instant = Instant::now();
+
         loop {
             // Wait until next period. Be careful not to hold a lock on state while sleeping.
             let maybe_next_instant = {
@@ -129,22 +171,31 @@ impl Worker {
                 accurate_sleep_until(next_instant);
             }
 
+            // execute
+            state.schedule.spin();
+            if state.schedule.is_terminated() {
+                break;
+            }
+
             // handle requests
             match state.rx_request.try_recv() {
                 Ok(WorkerRequest::Stop) => break,
-                Ok(WorkerRequest::Statistics) => state
+                Ok(WorkerRequest::Report) => state
                     .tx_reply
-                    .send(WorkerReply::Statistics(state.schedule.statistics()))
+                    .send(WorkerReply::Report(state.report()))
                     .unwrap(),
                 Err(_) => {
                     // FIXME
                 }
             };
 
-            // execute
-            state.schedule.spin();
-            if state.schedule.is_terminated() {
-                break;
+            let now = Instant::now();
+            if now - latest_report_instant > REPORT_RATE {
+                latest_report_instant = now;
+                state
+                    .tx_reply
+                    .send(WorkerReply::Report(state.report()))
+                    .unwrap();
             }
         }
 
@@ -152,15 +203,15 @@ impl Worker {
 
         state
             .tx_reply
-            .send(WorkerReply::Statistics(state.schedule.statistics()))
+            .send(WorkerReply::Report(state.report()))
             .ok();
     }
 
-    fn statistics(&self) -> HashMap<(String, String), Statistics> {
-        self.tx_request.send(WorkerRequest::Statistics).ok();
-        match self.rx_reply.recv() {
-            Ok(WorkerReply::Statistics(stats)) => stats,
-            _ => panic!(),
+    fn step(&mut self) {
+        while let Ok(msg) = self.rx_reply.try_recv() {
+            match msg {
+                WorkerReply::Report(report) => self.latest_report = Some(report),
+            }
         }
     }
 }

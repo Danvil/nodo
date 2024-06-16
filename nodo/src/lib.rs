@@ -2,6 +2,7 @@
 
 pub mod channels;
 pub mod codelet;
+pub mod inspector;
 pub mod runtime;
 pub mod sleep;
 pub mod task;

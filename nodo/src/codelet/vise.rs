@@ -4,9 +4,9 @@ use crate::codelet::codelet_instance::CodeletInstanceId;
 use crate::codelet::Codelet;
 use crate::codelet::CodeletExec;
 use crate::codelet::CodeletInstance;
-use crate::codelet::Statistics;
 use crate::codelet::TaskClock;
 use crate::codelet::Transition;
+use crate::codelet::VertexStatistics;
 use nodo_core::Outcome;
 use nodo_core::OutcomeKind;
 
@@ -15,7 +15,7 @@ pub struct Vise {
     name: String,
     type_name: String,
     instance: Box<dyn CodeletExec>,
-    statistics: Statistics,
+    statistics: VertexStatistics,
 }
 
 impl Vise {
@@ -25,7 +25,7 @@ impl Vise {
             name: instance.name.clone(),
             type_name: instance.type_name().to_string(),
             instance: Box::new(instance),
-            statistics: Statistics::new(),
+            statistics: VertexStatistics::default(),
         }
     }
 
@@ -37,7 +37,7 @@ impl Vise {
         &self.type_name
     }
 
-    pub fn statistics(&self) -> &Statistics {
+    pub fn statistics(&self) -> &VertexStatistics {
         &self.statistics
     }
 }
@@ -48,7 +48,7 @@ impl CodeletExec for Vise {
     }
 
     fn execute(&mut self, transition: Transition) -> Outcome {
-        let stats = &mut self.statistics.transitions[transition];
+        let stats = &mut self.statistics.0[transition];
         stats.begin();
 
         let outcome = self.instance.execute(transition);

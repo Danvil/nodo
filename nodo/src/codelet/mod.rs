@@ -2,6 +2,7 @@
 
 mod codelet_instance;
 mod executor;
+mod manifold;
 mod schedule;
 mod state_machine;
 mod statistics;
@@ -11,6 +12,7 @@ mod vise;
 
 pub use codelet_instance::*;
 pub use executor::*;
+pub use manifold::*;
 pub use schedule::*;
 pub use state_machine::*;
 pub use statistics::*;

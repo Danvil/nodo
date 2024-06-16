@@ -1,0 +1,132 @@
+// Copyright 2022 by David Weikersdorfer
+
+syntax = "proto3";
+
+package nodo.inspector;
+
+message Uri {
+  string fulltext = 1;
+}
+
+enum ConditionStatus {
+  ConditionStatus_Invalid = 0;
+  ConditionStatus_Satisfied = 1;
+  ConditionStatus_Waiting = 2;
+  ConditionStatus_Unsatisfied = 3;
+}
+
+message ConditionResult {
+  ConditionStatus status = 1;
+  int64 deadline = 2;
+}
+
+message ConditionsState {
+  map<uint64, ConditionResult> individual = 1;
+  ConditionResult combined = 2;
+}
+
+enum LifecycleState {
+  LifecycleState_Invalid = 0;
+  LifecycleState_Barren = 1;
+  LifecycleState_Inactive = 2;
+  LifecycleState_Running = 3;
+  LifecycleState_Paused = 4;
+  LifecycleState_Failed = 5;
+}
+
+message ExecutionData {
+  bool is_scheduled = 1;
+  LifecycleState target_lifecycle_state = 2;
+  LifecycleState current_lifecycle_state = 4;
+  ConditionsState conditions_state = 3;
+  bool has_failure = 5;
+  string error_message = 6;
+}
+
+message Tuid {
+  uint64 hash = 1;
+}
+
+message Message {
+  int64 pub_time = 1;
+  int64 pub_counter = 2;
+  int64 acq_time = 3;
+  uint64 acq_clock = 4;
+}
+
+message MessageSet {
+  repeated Message item = 1;
+  int64 num_skipped = 2;  // if >0 then messages contains only the first and last n/2 messages
+                          // where n is the number of messages sent.
+}
+
+message Channel {
+  bool is_alias = 5;
+  Tuid tuid = 1;
+  int64 cursor = 2;
+  int64 num_available = 3;
+  MessageSet messages = 4;
+}
+
+message Parameter {
+  Tuid tuid = 1;
+  string value = 2;
+  bool is_optional = 3;
+  bool is_mutable = 4;
+  bool is_default = 5;
+  bool has_value = 6;
+  bool is_alias = 7;
+}
+
+message SignalStatistics {
+  int64 count = 1;
+  double average_duration = 2;
+  double average_interval = 3;
+}
+
+message Statistics {
+  SignalStatistics on_create = 1;
+  SignalStatistics on_destroy = 2;
+  SignalStatistics on_start = 3;
+  SignalStatistics on_stop = 4;
+  SignalStatistics on_tick = 5;
+  SignalStatistics on_pause = 6;
+  SignalStatistics on_resume = 7;
+}
+
+message Vertex {
+  string name = 4;
+  map<uint64, Channel> rx_channels = 3;
+  map<uint64, Channel> tx_channels = 2;
+  map<uint64, Parameter> parameters = 5;
+  bool is_executable = 8;
+  ExecutionData execution_data = 6;
+  Statistics statistics = 7;
+}
+
+message WorkerStatisticsEntry {
+  int64 begin = 1;
+  int64 end = 2;
+  uint64 vertex_uid = 3;
+  int32 event = 4;
+}
+
+message WorkerStatistics {
+  repeated WorkerStatisticsEntry entries = 1;
+}
+
+message Worker {
+  WorkerStatistics statistics = 1;
+}
+
+message Manifold {
+  map<uint64, Vertex> vertices = 1;
+}
+
+message Worldstate {
+  map<uint64, Uri> uris = 2;
+  Manifold manifold = 1;
+  int64 app_time = 3;
+  int64 system_time = 4;
+  repeated Worker workers = 5;
+}
