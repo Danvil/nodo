@@ -266,6 +266,16 @@ impl<T> DoubleBufferRx<T> {
         self.front.len()
     }
 
+    /// Access the latest element in the queue (or None)
+    pub fn latest(&self) -> Option<&T> {
+        let n = self.front.len();
+        if n == 0 {
+            None
+        } else {
+            Some(&self.front[n - 1])
+        }
+    }
+
     /// Returns true if the queue contains the maximum number of elements. A queue with the
     /// 'Resize' overflow policy will never be full.
     pub fn is_full(&self) -> bool {
