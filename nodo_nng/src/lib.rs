@@ -90,6 +90,10 @@ impl Publisher {
         }
     }
 
+    pub fn schedule_builder_mut(&mut self) -> &mut ScheduleBuilder {
+        &mut self.schedule_builder
+    }
+
     pub fn publish<T>(&mut self, topic: &str, tx: &mut DoubleBufferTx<Message<T>>) -> EyreResult<()>
     where
         T: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static,
