@@ -3,6 +3,7 @@
 mod codelet_instance;
 mod executor;
 mod schedule;
+mod sequence;
 mod state_machine;
 mod statistics;
 mod task_clock;
@@ -12,6 +13,7 @@ mod vise;
 pub use codelet_instance::*;
 pub use executor::*;
 pub use schedule::*;
+pub use sequence::*;
 pub use state_machine::*;
 pub use statistics::*;
 pub use task_clock::*;

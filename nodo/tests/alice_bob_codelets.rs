@@ -4,6 +4,7 @@ use nodo::codelet::ScheduleBuilder;
 use nodo::codelet::ScheduleExecutor;
 use nodo::prelude::*;
 use nodo::runtime::Runtime;
+use nodo_std::Terminator;
 use std::time::Duration;
 
 mod common;
@@ -114,6 +115,26 @@ fn alice_bob_codelets() {
         ScheduleBuilder::new()
             .with_period(Duration::from_millis(2))
             .with_max_step_count(NUM_MESSAGES)
+            .with(alice)
+            .with(bob)
+            .finalize(),
+    );
+}
+
+#[test]
+fn alice_bob_codelets_with_terminator() {
+    init_reporting();
+
+    let term = Terminator::new(NUM_MESSAGES - 1).into_instance("terminator", ());
+    let mut alice = Alice { num_sent: 0 }.into_instance("alice", ());
+    let mut bob = Bob { num_recv: 0 }.into_instance("bob", ());
+
+    alice.tx.ping.connect(&mut bob.rx.ping).unwrap();
+
+    test_schedule(
+        ScheduleBuilder::new()
+            .with_period(Duration::from_millis(2))
+            .with(term)
             .with(alice)
             .with(bob)
             .finalize(),

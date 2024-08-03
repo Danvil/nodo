@@ -19,5 +19,6 @@ profiling = "1.0"
 thiserror = "1"
 
 [dev-dependencies]
+nodo_std = { path = "../nodo_std" }
 color-eyre = "0.6"
 env_logger = "*"

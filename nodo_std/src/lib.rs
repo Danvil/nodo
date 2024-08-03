@@ -12,6 +12,7 @@ mod pipe;
 mod serializer;
 mod sink;
 mod source;
+mod terminator;
 mod topic_join;
 mod topic_split;
 
@@ -27,5 +28,6 @@ pub use pipe::*;
 pub use serializer::*;
 pub use sink::*;
 pub use source::*;
+pub use terminator::*;
 pub use topic_join::*;
 pub use topic_split::*;

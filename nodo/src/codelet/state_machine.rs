@@ -24,6 +24,9 @@ pub enum State {
     /// Codelet is paused. Operation can be resumed with the resume transition. It is also possible
     /// to stop the codelet.
     Paused,
+
+    /// Codelet is in an error state
+    Error,
 }
 
 impl State {
@@ -46,7 +49,6 @@ impl State {
 pub struct StateMachine<C> {
     inner: C,
     state: State,
-    has_error: bool,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -65,7 +67,6 @@ impl<C> StateMachine<C> {
         Self {
             inner,
             state: State::Inactive,
-            has_error: false,
         }
     }
 
@@ -75,6 +76,10 @@ impl<C> StateMachine<C> {
 
     pub fn inner_mut(&mut self) -> &mut C {
         &mut self.inner
+    }
+
+    pub fn state(&self) -> State {
+        self.state
     }
 
     pub fn is_valid_request(&self, request: Transition) -> bool {
@@ -92,7 +97,7 @@ impl<C> StateMachine<C> {
                     return Ok(kind);
                 }
                 Err(err) => {
-                    self.has_error = true;
+                    self.state = State::Error;
                     return Err(TransitionError::ExecutionFailure(transition, err));
                 }
             }
@@ -107,7 +112,6 @@ impl<C> Debug for StateMachine<C> {
         fmt.debug_struct("StateMachine")
             .field("inner", &"()")
             .field("state", &self.state)
-            .field("has_error", &self.has_error)
             .finish()
     }
 }
