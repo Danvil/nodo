@@ -44,7 +44,7 @@ impl Executor {
     }
 
     pub fn push(&mut self, mut schedule: ScheduleExecutor) {
-        schedule.setup(TaskClock::from(self.clock.clone()));
+        schedule.setup_task_clock(TaskClock::from(self.clock.clone()));
         self.workers.push(Worker::new(schedule));
     }
 

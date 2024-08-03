@@ -1,11 +1,14 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::CodeletExec;
+use crate::codelet::vise::ViseTrait;
+use crate::codelet::CodeletInstance;
+use crate::codelet::DynamicVise;
+use crate::codelet::Lifecycle;
 use crate::codelet::StateMachine;
 use crate::codelet::Statistics;
 use crate::codelet::TaskClock;
 use crate::codelet::Transition;
-use crate::codelet::Vise;
+use crate::prelude::Codelet;
 use nodo_core::*;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -13,7 +16,7 @@ use std::time::Instant;
 
 /// A helper type to build a schedule
 pub struct ScheduleBuilder {
-    codelets: Vec<Vise>,
+    codelets: Vec<DynamicVise>,
     name: String,
     thread_id: usize,
     max_step_count: Option<usize>,
@@ -62,8 +65,8 @@ impl ScheduleBuilder {
         self
     }
 
-    pub fn append<T: Into<Vise>>(&mut self, instance: T) {
-        self.codelets.push(instance.into());
+    pub fn append<C: Codelet + 'static>(&mut self, instance: CodeletInstance<C>) {
+        self.codelets.push(DynamicVise::new(instance));
     }
 
     #[must_use]
@@ -95,17 +98,17 @@ pub trait Schedulable {
     fn schedule(self, sched: &mut ScheduleBuilder);
 }
 
-impl Schedulable for Vec<Vise> {
-    fn schedule(self, sched: &mut ScheduleBuilder) {
-        for x in self.into_iter() {
-            sched.append(x);
-        }
-    }
-}
+// impl Schedulable for Vec<Vise> {
+//     fn schedule(self, sched: &mut ScheduleBuilder) {
+//         for x in self.into_iter() {
+//             sched.append(x);
+//         }
+//     }
+// }
 
-impl<T: Into<Vise>> Schedulable for T {
+impl<C: Codelet + 'static> Schedulable for CodeletInstance<C> {
     fn schedule(self, sched: &mut ScheduleBuilder) {
-        sched.append(self.into());
+        sched.append(self);
     }
 }
 
@@ -199,8 +202,8 @@ impl ScheduleExecutor {
         self.last_instant
     }
 
-    pub fn setup(&mut self, clock: TaskClock) {
-        self.sm.inner_mut().setup(clock);
+    pub fn setup_task_clock(&mut self, clock: TaskClock) {
+        self.sm.inner_mut().setup_task_clock(clock);
     }
 
     pub fn spin(&mut self) {
@@ -272,18 +275,20 @@ impl ScheduleExecutor {
 }
 
 struct CodeletSequence {
-    items: Vec<StateMachine<Vise>>,
+    items: Vec<StateMachine<DynamicVise>>,
     has_error: bool,
 }
 
-impl CodeletExec for CodeletSequence {
-    fn setup(&mut self, clock: TaskClock) {
+impl CodeletSequence {
+    pub fn setup_task_clock(&mut self, clock: TaskClock) {
         for csm in self.items.iter_mut() {
-            csm.inner_mut().setup(clock.clone());
+            csm.inner_mut().setup_task_clock(clock.clone());
         }
     }
+}
 
-    fn execute(&mut self, transition: Transition) -> Outcome {
+impl Lifecycle for CodeletSequence {
+    fn cycle(&mut self, transition: Transition) -> Outcome {
         let mut result = CodeletSequenceExecuteResult::new();
 
         let mut is_terminated = true;
@@ -323,7 +328,7 @@ impl CodeletSequenceExecuteResult {
         CodeletSequenceExecuteResult { maybe: None }
     }
 
-    fn mark(&mut self, vise: &Vise, error: Report) {
+    fn mark(&mut self, vise: &DynamicVise, error: Report) {
         if self.maybe.is_none() {
             self.maybe = Some(CodeletSequenceExecuteError::new());
         }
@@ -346,7 +351,7 @@ impl CodeletSequenceExecuteError {
         }
     }
 
-    fn mark(&mut self, vise: &Vise, error: Report) {
+    fn mark(&mut self, vise: &DynamicVise, error: Report) {
         self.failures.push((vise.name().to_string(), error));
     }
 }

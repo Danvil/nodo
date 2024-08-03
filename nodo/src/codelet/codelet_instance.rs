@@ -3,6 +3,7 @@
 use crate::channels::FlushResult;
 use crate::channels::SyncResult;
 use crate::channels::{RxBundle, TxBundle};
+use crate::codelet::Lifecycle;
 use crate::codelet::{Codelet, Context, TaskClock, Transition};
 use nodo_core::*;
 
@@ -48,6 +49,10 @@ impl<C: Codelet> CodeletInstance<C> {
             rx_sync_results: vec![SyncResult::ZERO; rx_count],
             tx_flush_results: vec![FlushResult::ZERO; tx_count],
         }
+    }
+
+    pub fn type_name(&self) -> &str {
+        std::any::type_name::<C>()
     }
 
     pub fn modify_state_with<F>(mut self, f: F) -> Self
@@ -198,21 +203,8 @@ impl<C: Codelet> CodeletInstance<C> {
     }
 }
 
-/// An abstract interface for `CodeletInstance` hiding the concrete codelet type
-pub trait CodeletExec: Send {
-    /// Called once at the beginning to setup the clock
-    fn setup(&mut self, clock: TaskClock);
-
-    /// Called to transition the state of the codelet instance
-    fn execute(&mut self, transition: Transition) -> Outcome;
-}
-
-impl<C: Codelet> CodeletExec for CodeletInstance<C> {
-    fn setup(&mut self, clock: TaskClock) {
-        self.clock = Some(clock);
-    }
-
-    fn execute(&mut self, transition: Transition) -> Outcome {
+impl<C: Codelet> Lifecycle for CodeletInstance<C> {
+    fn cycle(&mut self, transition: Transition) -> Outcome {
         match transition {
             Transition::Start => self.start(),
             Transition::Step => self.step(),
@@ -220,24 +212,5 @@ impl<C: Codelet> CodeletExec for CodeletInstance<C> {
             Transition::Pause => self.pause(),
             Transition::Resume => self.resume(),
         }
-    }
-}
-
-/// Identification of a codelet instance
-pub trait CodeletInstanceId {
-    /// The name of this instance
-    fn name(&self) -> &str;
-
-    /// The typename of the codelet used by this instance
-    fn type_name(&self) -> &str;
-}
-
-impl<C: Codelet> CodeletInstanceId for CodeletInstance<C> {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn type_name(&self) -> &str {
-        std::any::type_name::<C>()
     }
 }

@@ -1,11 +1,16 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::CodeletExec;
 use crate::codelet::Transition;
 use core::fmt::Debug;
 use core::fmt::Formatter;
+use nodo_core::Outcome;
 use nodo_core::OutcomeKind;
 use nodo_core::Report;
+
+pub trait Lifecycle {
+    /// Applies a lifecycel change
+    fn cycle(&mut self, transition: Transition) -> Outcome;
+}
 
 /// Possible states of codelets
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -55,7 +60,7 @@ pub enum TransitionError {
     ExecutionFailure(Transition, Report),
 }
 
-impl<C: CodeletExec> StateMachine<C> {
+impl<C> StateMachine<C> {
     pub fn new(inner: C) -> Self {
         Self {
             inner,
@@ -76,9 +81,12 @@ impl<C: CodeletExec> StateMachine<C> {
         self.state.transition(request).is_some()
     }
 
-    pub fn transition(&mut self, transition: Transition) -> Result<OutcomeKind, TransitionError> {
+    pub fn transition(&mut self, transition: Transition) -> Result<OutcomeKind, TransitionError>
+    where
+        C: Lifecycle,
+    {
         if let Some(next_state) = self.state.transition(transition) {
-            match self.inner.execute(transition) {
+            match self.inner.cycle(transition) {
                 Ok(kind) => {
                     self.state = next_state;
                     return Ok(kind);

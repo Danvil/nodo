@@ -1,9 +1,8 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::codelet_instance::CodeletInstanceId;
 use crate::codelet::Codelet;
-use crate::codelet::CodeletExec;
 use crate::codelet::CodeletInstance;
+use crate::codelet::Lifecycle;
 use crate::codelet::Statistics;
 use crate::codelet::TaskClock;
 use crate::codelet::Transition;
@@ -11,30 +10,18 @@ use nodo_core::Outcome;
 use nodo_core::OutcomeKind;
 
 /// Wrapper around a codelet with additional information
-pub struct Vise {
-    name: String,
-    type_name: String,
-    instance: Box<dyn CodeletExec>,
+pub struct Vise<C: Codelet> {
+    instance: CodeletInstance<C>,
     statistics: Statistics,
 }
 
-impl Vise {
-    pub fn new<C: Codelet + 'static>(mut instance: CodeletInstance<C>) -> Self {
+impl<C: Codelet> Vise<C> {
+    pub fn new(mut instance: CodeletInstance<C>) -> Self {
         instance.is_scheduled = true; // TODO is this the right location?
         Self {
-            name: instance.name.clone(),
-            type_name: instance.type_name().to_string(),
-            instance: Box::new(instance),
+            instance,
             statistics: Statistics::new(),
         }
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn type_name(&self) -> &str {
-        &self.type_name
     }
 
     pub fn statistics(&self) -> &Statistics {
@@ -42,16 +29,12 @@ impl Vise {
     }
 }
 
-impl CodeletExec for Vise {
-    fn setup(&mut self, clock: TaskClock) {
-        self.instance.setup(clock)
-    }
-
-    fn execute(&mut self, transition: Transition) -> Outcome {
+impl<C: Codelet> Lifecycle for Vise<C> {
+    fn cycle(&mut self, transition: Transition) -> Outcome {
         let stats = &mut self.statistics.transitions[transition];
         stats.begin();
 
-        let outcome = self.instance.execute(transition);
+        let outcome = self.instance.cycle(transition);
 
         let skipped = matches!(outcome, Ok(OutcomeKind::Skipped));
         stats.end(skipped);
@@ -60,8 +43,66 @@ impl CodeletExec for Vise {
     }
 }
 
-impl<T: Codelet + 'static> From<CodeletInstance<T>> for Vise {
-    fn from(other: CodeletInstance<T>) -> Vise {
-        Vise::new(other)
+pub trait ViseTrait: Send + Lifecycle {
+    /// The name of the codelet instance
+    fn name(&self) -> &str;
+
+    /// The typename of the codelet used by this instance
+    fn type_name(&self) -> &str;
+
+    /// Called once at the beginning to setup the clock
+    fn setup_task_clock(&mut self, clock: TaskClock);
+
+    /// Get instantce statistics
+    fn statistics(&self) -> &Statistics;
+}
+
+impl<C: Codelet> ViseTrait for Vise<C> {
+    fn name(&self) -> &str {
+        &self.instance.name
+    }
+
+    fn type_name(&self) -> &str {
+        self.instance.type_name()
+    }
+
+    fn setup_task_clock(&mut self, clock: TaskClock) {
+        self.instance.clock = Some(clock);
+    }
+
+    fn statistics(&self) -> &Statistics {
+        &self.statistics
+    }
+}
+
+pub struct DynamicVise(pub(crate) Box<dyn ViseTrait>);
+
+impl DynamicVise {
+    pub fn new<C: Codelet + 'static>(instance: CodeletInstance<C>) -> Self {
+        Self(Box::new(Vise::new(instance)))
+    }
+}
+
+impl ViseTrait for DynamicVise {
+    fn name(&self) -> &str {
+        self.0.name()
+    }
+
+    fn type_name(&self) -> &str {
+        self.0.type_name()
+    }
+
+    fn setup_task_clock(&mut self, clock: TaskClock) {
+        self.0.setup_task_clock(clock);
+    }
+
+    fn statistics(&self) -> &Statistics {
+        self.0.statistics()
+    }
+}
+
+impl Lifecycle for DynamicVise {
+    fn cycle(&mut self, transition: Transition) -> Outcome {
+        self.0.cycle(transition)
     }
 }
