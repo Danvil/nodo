@@ -99,7 +99,7 @@ fn init_reporting() {
 fn test_schedule(schedule: ScheduleExecutor) {
     let mut rt = Runtime::new();
     rt.add_codelet_schedule(schedule);
-    rt.join().unwrap();
+    rt.spin();
 }
 
 #[test]

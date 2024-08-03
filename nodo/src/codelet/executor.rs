@@ -13,13 +13,6 @@ pub struct Executor {
     workers: Vec<Worker>,
 }
 
-pub struct Worker {
-    name: String,
-    thread: Option<std::thread::JoinHandle<()>>,
-    tx_request: std::sync::mpsc::Sender<WorkerRequest>,
-    rx_reply: std::sync::mpsc::Receiver<WorkerReply>,
-}
-
 pub enum WorkerRequest {
     Stop,
     Statistics,
@@ -46,6 +39,10 @@ impl Executor {
     pub fn push(&mut self, mut schedule: ScheduleExecutor) {
         schedule.setup_task_clock(TaskClock::from(self.clock.clone()));
         self.workers.push(Worker::new(schedule));
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.workers.iter().all(|w| w.is_finished())
     }
 
     pub fn join(&mut self) {
@@ -84,6 +81,13 @@ impl Executor {
     }
 }
 
+pub struct Worker {
+    name: String,
+    thread: Option<std::thread::JoinHandle<()>>,
+    tx_request: std::sync::mpsc::Sender<WorkerRequest>,
+    rx_reply: std::sync::mpsc::Receiver<WorkerReply>,
+}
+
 impl Worker {
     fn new(schedule: ScheduleExecutor) -> Self {
         let (tx_request, rx_request) = std::sync::mpsc::channel();
@@ -105,6 +109,10 @@ impl Worker {
             tx_request,
             rx_reply,
         }
+    }
+
+    fn is_finished(&self) -> bool {
+        self.thread.as_ref().map_or(true, |h| h.is_finished())
     }
 
     fn join(&mut self) -> Result<(), ()> {

@@ -4,7 +4,6 @@ resolver = "2"
 members = [
   "examples",
   "nodo",
-  "nodo_async",
   "nodo_core",
   "nodo_derive",
   "nodo_json",
