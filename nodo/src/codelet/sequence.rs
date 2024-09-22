@@ -20,9 +20,9 @@ impl CodeletSequence {
         }
     }
 
-    pub fn setup_task_clock(&mut self, clock: TaskClock) {
+    pub fn setup_task_clocks(&mut self, clocks: TaskClocks) {
         for csm in self.items.iter_mut() {
-            csm.inner_mut().setup_task_clock(clock.clone());
+            csm.inner_mut().setup_task_clocks(clocks.clone());
         }
     }
 

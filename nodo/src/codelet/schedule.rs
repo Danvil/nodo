@@ -5,7 +5,7 @@ use crate::codelet::CodeletSequence;
 use crate::codelet::DynamicVise;
 use crate::codelet::StateMachine;
 use crate::codelet::Statistics;
-use crate::codelet::TaskClock;
+use crate::codelet::TaskClocks;
 use crate::codelet::Transition;
 use crate::prelude::Codelet;
 use nodo_core::*;
@@ -184,8 +184,8 @@ impl ScheduleExecutor {
         self.last_instant
     }
 
-    pub fn setup_task_clock(&mut self, clock: TaskClock) {
-        self.sm.inner_mut().setup_task_clock(clock);
+    pub fn setup_task_clocks(&mut self, clocks: TaskClocks) {
+        self.sm.inner_mut().setup_task_clocks(clocks);
     }
 
     pub fn spin(&mut self) {

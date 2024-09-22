@@ -4,7 +4,7 @@ use crate::codelet::Codelet;
 use crate::codelet::CodeletInstance;
 use crate::codelet::Lifecycle;
 use crate::codelet::Statistics;
-use crate::codelet::TaskClock;
+use crate::codelet::TaskClocks;
 use crate::codelet::Transition;
 use nodo_core::Outcome;
 use nodo_core::OutcomeKind;
@@ -51,7 +51,7 @@ pub trait ViseTrait: Send + Lifecycle {
     fn type_name(&self) -> &str;
 
     /// Called once at the beginning to setup the clock
-    fn setup_task_clock(&mut self, clock: TaskClock);
+    fn setup_task_clocks(&mut self, clocks: TaskClocks);
 
     /// Get instantce statistics
     fn statistics(&self) -> &Statistics;
@@ -66,8 +66,8 @@ impl<C: Codelet> ViseTrait for Vise<C> {
         self.instance.type_name()
     }
 
-    fn setup_task_clock(&mut self, clock: TaskClock) {
-        self.instance.clock = Some(clock);
+    fn setup_task_clocks(&mut self, clocks: TaskClocks) {
+        self.instance.clocks = Some(clocks);
     }
 
     fn statistics(&self) -> &Statistics {
@@ -92,8 +92,8 @@ impl ViseTrait for DynamicVise {
         self.0.type_name()
     }
 
-    fn setup_task_clock(&mut self, clock: TaskClock) {
-        self.0.setup_task_clock(clock);
+    fn setup_task_clocks(&mut self, clocks: TaskClocks) {
+        self.0.setup_task_clocks(clocks);
     }
 
     fn statistics(&self) -> &Statistics {

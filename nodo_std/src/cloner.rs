@@ -36,19 +36,18 @@ impl<T: Clone + Send + Sync> Codelet for Cloner<T> {
         ((), DoubleBufferTx::new(1))
     }
 
-    fn step(&mut self, ctx: &Context<Self>, _: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
+    fn step(&mut self, cx: &Context<Self>, _: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
         if let Some(max_count) = self.max_count {
             if self.count >= max_count {
                 return SKIPPED;
             }
         }
 
-        let now = ctx.clock.real_time();
         tx.push(Message {
             seq: 0,
             stamp: Stamp {
-                acqtime: Acqtime::new(now.into()),
-                pubtime: now.into(),
+                acqtime: cx.clocks.sys_mono.now(),
+                pubtime: cx.clocks.app_mono.now(),
             },
             value: self.blueprint.clone(),
         })?;

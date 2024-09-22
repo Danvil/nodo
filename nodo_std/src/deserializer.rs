@@ -58,7 +58,7 @@ where
                     seq: message.seq,
                     stamp: Stamp {
                         acqtime: message.stamp.acqtime,
-                        pubtime: cx.clock.step_time(),
+                        pubtime: cx.clocks.app_mono.now(),
                     },
                     value: self.format.deserialize(message.value)?,
                 })?;

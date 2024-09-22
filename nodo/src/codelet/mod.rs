@@ -70,7 +70,11 @@ where
     C: Codelet + ?Sized,
 {
     /// The instance clock provides timings of the default clock specific to this instance.
+    #[deprecated(note = "Use clocks instead")]
     pub clock: &'a TaskClock,
+
+    /// Access to various clocks
+    pub clocks: &'a TaskClocks,
 
     /// The configuration used for this instance
     pub config: &'a C::Config,

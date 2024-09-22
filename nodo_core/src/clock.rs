@@ -1,9 +1,7 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::Timestamp;
-use core::cell::RefCell;
 use core::marker::PhantomData;
-use std::sync::Arc;
 use std::time::Instant;
 
 const DEFAULT_CLOCK_ID: u64 = 0;
@@ -33,19 +31,20 @@ pub trait Clock<M> {
     fn now(&self) -> Timestamp<M>;
 }
 
+/// A monotonic clock which starts when the application starts
 #[derive(Clone)]
-pub struct MonotonicClock<M> {
+pub struct AppMonotonicClock<M> {
     reference: Instant,
     _marker: PhantomData<M>,
 }
 
-impl<M> Clock<M> for MonotonicClock<M> {
+impl<M> Clock<M> for AppMonotonicClock<M> {
     fn now(&self) -> Timestamp<M> {
         Timestamp::new(self.reference.elapsed())
     }
 }
 
-impl<M> MonotonicClock<M> {
+impl<M> AppMonotonicClock<M> {
     pub fn new() -> Self {
         Self {
             reference: Instant::now(),
@@ -54,21 +53,41 @@ impl<M> MonotonicClock<M> {
     }
 }
 
-impl<M> Default for MonotonicClock<M> {
+impl<M> Default for AppMonotonicClock<M> {
     fn default() -> Self {
-        MonotonicClock::new()
+        AppMonotonicClock::new()
     }
 }
 
+/// A monotonic clock which starts when the computer boots
+///
+/// TODO Currently uses nix::time::clock_gettime but it is unclear if that works under Windows and
+///      or Mac.
 #[derive(Clone)]
-pub struct SharedMonotonicClock<M>(Arc<RefCell<MonotonicClock<M>>>);
+pub struct SysMonotonicClock<M> {
+    _marker: PhantomData<M>,
+}
 
-impl<M> SharedMonotonicClock<M> {
-    pub fn new() -> Self {
-        Self(Arc::new(RefCell::new(MonotonicClock::new())))
+impl<M> Clock<M> for SysMonotonicClock<M> {
+    fn now(&self) -> Timestamp<M> {
+        // SAFETY: According to the error values listed in the reference for clock_gettime
+        //         (see https://man7.org/linux/man-pages/man3/clock_gettime.3.html)
+        //         the get function should not return any errors for CLOCK_MONOTONIC.
+        let time = nix::time::clock_gettime(nix::time::ClockId::CLOCK_MONOTONIC).unwrap();
+        Timestamp::new(std::time::Duration::from(time))
     }
+}
 
-    pub fn now(&self) -> Timestamp<M> {
-        self.0.borrow().now()
+impl<M> SysMonotonicClock<M> {
+    pub fn new() -> Self {
+        Self {
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<M> Default for SysMonotonicClock<M> {
+    fn default() -> Self {
+        SysMonotonicClock::new()
     }
 }

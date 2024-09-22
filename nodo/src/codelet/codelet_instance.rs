@@ -4,7 +4,7 @@ use crate::channels::FlushResult;
 use crate::channels::SyncResult;
 use crate::channels::{RxBundle, TxBundle};
 use crate::codelet::Lifecycle;
-use crate::codelet::{Codelet, Context, TaskClock, Transition};
+use crate::codelet::{Codelet, Context, TaskClocks, Transition};
 use nodo_core::*;
 
 /// Named instance of a codelet with configuration and channel bundels
@@ -15,7 +15,7 @@ pub struct CodeletInstance<C: Codelet> {
     pub rx: C::Rx,
     pub tx: C::Tx,
 
-    pub(crate) clock: Option<TaskClock>,
+    pub(crate) clocks: Option<TaskClocks>,
     pub(crate) is_scheduled: bool,
     pub(crate) rx_sync_results: Vec<SyncResult>,
     pub(crate) tx_flush_results: Vec<FlushResult>,
@@ -44,7 +44,7 @@ impl<C: Codelet> CodeletInstance<C> {
             config,
             rx,
             tx,
-            clock: None,
+            clocks: None,
             is_scheduled: false,
             rx_sync_results: vec![SyncResult::ZERO; rx_count],
             tx_flush_results: vec![FlushResult::ZERO; tx_count],
@@ -98,11 +98,12 @@ impl<C: Codelet> CodeletInstance<C> {
 
         self.sync()?;
 
-        self.clock.as_mut().unwrap().start();
+        self.clocks.as_mut().unwrap().on_codelet_start();
 
         let outcome = self.state.start(
             &Context {
-                clock: &self.clock.as_ref().unwrap(),
+                clock: &self.clocks.as_ref().unwrap().deprecated_task_clock,
+                clocks: &self.clocks.as_ref().unwrap(),
                 config: &self.config,
             },
             &mut self.rx,
@@ -121,9 +122,12 @@ impl<C: Codelet> CodeletInstance<C> {
 
         self.sync()?;
 
+        self.clocks.as_mut().unwrap().on_codelet_stop();
+
         let outcome = self.state.stop(
             &Context {
-                clock: &self.clock.as_ref().unwrap(),
+                clock: &self.clocks.as_ref().unwrap().deprecated_task_clock,
+                clocks: &self.clocks.as_ref().unwrap(),
                 config: &self.config,
             },
             &mut self.rx,
@@ -142,11 +146,12 @@ impl<C: Codelet> CodeletInstance<C> {
 
         self.sync()?;
 
-        self.clock.as_mut().unwrap().step();
+        self.clocks.as_mut().unwrap().on_codelet_step();
 
         let outcome = self.state.step(
             &Context {
-                clock: &self.clock.as_ref().unwrap(),
+                clock: &self.clocks.as_ref().unwrap().deprecated_task_clock,
+                clocks: &self.clocks.as_ref().unwrap(),
                 config: &self.config,
             },
             &mut self.rx,

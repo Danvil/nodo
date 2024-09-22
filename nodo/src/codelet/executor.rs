@@ -1,15 +1,14 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
+use crate::codelet::Clocks;
 use crate::codelet::ScheduleExecutor;
 use crate::codelet::Statistics;
-use crate::codelet::TaskClock;
+use crate::codelet::TaskClocks;
 use crate::sleep::accurate_sleep_until;
-use nodo_core::MonotonicClock;
-use nodo_core::PubtimeMarker;
 use std::collections::HashMap;
 
 pub struct Executor {
-    clock: MonotonicClock<PubtimeMarker>,
+    clocks: Clocks,
     workers: Vec<Worker>,
 }
 
@@ -31,13 +30,13 @@ pub struct WorkerState {
 impl Executor {
     pub fn new() -> Self {
         Self {
-            clock: MonotonicClock::new(),
+            clocks: Clocks::new(),
             workers: Vec::new(),
         }
     }
 
     pub fn push(&mut self, mut schedule: ScheduleExecutor) {
-        schedule.setup_task_clock(TaskClock::from(self.clock.clone()));
+        schedule.setup_task_clocks(TaskClocks::from(self.clocks.clone()));
         self.workers.push(Worker::new(schedule));
     }
 
