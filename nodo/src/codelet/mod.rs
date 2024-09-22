@@ -76,12 +76,21 @@ where
     pub config: &'a C::Config,
 }
 
-/// All codelets can be converted into a CodeletInstance
+/// All instances of codelets can be converted into a CodeletInstance with into_instance
 ///
 /// ```
+/// use nodo::prelude::*;
+///
 /// struct MyCodelet { num: u32 };
 ///
-/// let c = MyCodelet{ num: 42 }.into_instance("my_name", MyCodelet::Config);
+/// impl Codelet for MyCodelet {
+///   type Config = ();
+///   type Rx = ();
+///   type Tx = ();
+///   fn build_bundles(_: &Self::Config) -> (Self::Rx, Self::Tx) { ((),()) }
+/// }
+///
+/// let c = MyCodelet{ num: 42 }.into_instance("my_name", ());
 /// ```
 pub trait IntoInstance: Codelet + Sized {
     fn into_instance<S: Into<String>>(self, name: S, config: Self::Config)
@@ -104,10 +113,19 @@ where
 /// Default-constructible codelets can be instantiated directly
 ///
 /// ```
-/// #[derive(Default)]
-/// struct MyCodelet { flag: bool };
+/// use nodo::prelude::*;
 ///
-/// let c = MyCodelet::instantiate("my_name", MyCodelet::Config);
+/// #[derive(Default)]
+/// struct MyCodelet { text: String };
+///
+/// impl Codelet for MyCodelet {
+///   type Config = ();
+///   type Rx = ();
+///   type Tx = ();
+///   fn build_bundles(_: &Self::Config) -> (Self::Rx, Self::Tx) { ((),()) }
+/// }
+///
+/// let c = MyCodelet::instantiate("my_name", ());
 /// ```
 pub trait Instantiate: Codelet + Sized {
     fn instantiate<S: Into<String>>(name: S, config: Self::Config) -> CodeletInstance<Self>;
