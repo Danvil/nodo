@@ -44,6 +44,14 @@ where
         }
     }
 
+    fn start(&mut self, _cx: &Context<Self>, rx: &mut Self::Rx, _tx: &mut Self::Tx) -> Outcome {
+        // FIXME There is a general problem in nodo as messages can be received during start, and
+        //       if they are not handled EnforceEmpty will panic.
+        //       In the wild only this codelet seem to have this problem so we fix it here for now.
+        while let Some(_) = rx.try_pop() {}
+        SUCCESS
+    }
+
     fn step(&mut self, ctx: &Context<Self>, rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
         match ctx.config {
             PipeConfig::OneToOne => {
