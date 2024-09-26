@@ -3,6 +3,7 @@
 mod cloner;
 mod convert;
 mod deserializer;
+mod identity;
 mod join;
 mod log;
 mod multiplexer;
@@ -19,6 +20,7 @@ mod topic_split;
 pub use cloner::*;
 pub use convert::*;
 pub use deserializer::*;
+pub use identity::*;
 pub use join::*;
 pub use log::*;
 pub use multiplexer::*;
