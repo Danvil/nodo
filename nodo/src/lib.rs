@@ -8,6 +8,8 @@ pub mod task;
 pub mod zield;
 
 pub mod prelude {
+    pub use crate::channels::connect;
+    pub use crate::channels::Connect;
     pub use crate::channels::DoubleBufferRx;
     pub use crate::channels::DoubleBufferTx;
     pub use crate::channels::OverflowPolicy;
