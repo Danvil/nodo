@@ -78,6 +78,7 @@ impl Codelet for NngPub {
         // SAFETY: guaranteed by start
         let socket = self.socket.as_mut().unwrap();
 
+        let mut count = 0;
         while let Some(message) = rx.try_pop() {
             let topic_buffer = serialize_topic(&message.value.topic);
 
@@ -97,10 +98,16 @@ impl Codelet for NngPub {
 
             socket.send(outmsg).map_err(|(_, err)| err)?;
 
-            self.message_count += 1;
+            count += 1;
         }
 
-        SUCCESS
+        self.message_count += count;
+
+        if count > 0 {
+            SUCCESS
+        } else {
+            SKIPPED
+        }
     }
 }
 
