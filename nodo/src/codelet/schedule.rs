@@ -1,23 +1,26 @@
-// Copyright 2023 by David Weikersdorfer. All rights reserved.
+// Copyright 2024 by David Weikersdorfer. All rights reserved.
 
+use crate::codelet::vise::ViseTrait;
 use crate::codelet::CodeletInstance;
-use crate::codelet::CodeletSequence;
 use crate::codelet::DynamicVise;
+use crate::codelet::Lifecycle;
 use crate::codelet::StateMachine;
 use crate::codelet::Statistics;
 use crate::codelet::TaskClocks;
 use crate::codelet::Transition;
 use crate::prelude::Codelet;
+use crate::prelude::Sequence;
+use core::time::Duration;
+use nodo_core::Report;
 use nodo_core::*;
 use std::collections::HashMap;
-use std::time::Duration;
 use std::time::Instant;
 
 /// A helper type to build a schedule
 pub struct ScheduleBuilder {
     name: String,
     thread_id: usize,
-    vises: Vec<DynamicVise>,
+    sequences: Vec<Sequence>,
     max_step_count: Option<usize>,
     period: Option<Duration>,
 }
@@ -28,7 +31,7 @@ impl ScheduleBuilder {
         Self {
             name: String::new(),
             thread_id: 0,
-            vises: Vec::new(),
+            sequences: Vec::new(),
             max_step_count: None,
             period: None,
         }
@@ -52,6 +55,7 @@ impl ScheduleBuilder {
         self
     }
 
+    #[deprecated]
     #[must_use]
     pub fn with_max_step_count(mut self, max_step_count: usize) -> Self {
         self.max_step_count = Some(max_step_count);
@@ -64,8 +68,13 @@ impl ScheduleBuilder {
         self
     }
 
+    #[deprecated(note = "Use Sequence instead")]
     pub fn append<C: Codelet + 'static>(&mut self, instance: CodeletInstance<C>) {
-        self.vises.push(DynamicVise::new(instance));
+        self.sequences.push(Sequence {
+            name: "".into(),
+            vises: vec![DynamicVise::new(instance)],
+            period: None,
+        })
     }
 
     #[must_use]
@@ -73,7 +82,11 @@ impl ScheduleBuilder {
         ScheduleExecutor {
             name: self.name,
             thread_id: self.thread_id,
-            sm: StateMachine::new(CodeletSequence::new(self.vises)),
+            sm: StateMachine::new(SequenceGroupExec::new(
+                self.sequences
+                    .into_iter()
+                    .map(|seq| SequenceExec::new(seq.name, seq.period, seq.vises)),
+            )),
             next_transition: Some(Transition::Start),
             max_step_count: self.max_step_count,
             num_steps: 0,
@@ -91,6 +104,12 @@ pub trait Schedulable {
 impl<C: Codelet + 'static> Schedulable for CodeletInstance<C> {
     fn schedule(self, sched: &mut ScheduleBuilder) {
         sched.append(self);
+    }
+}
+
+impl Schedulable for Sequence {
+    fn schedule(self, sched: &mut ScheduleBuilder) {
+        sched.sequences.push(self);
     }
 }
 
@@ -155,7 +174,7 @@ impl<A: Schedulable> Schedulable for Option<A> {
 pub struct ScheduleExecutor {
     name: String,
     thread_id: usize,
-    sm: StateMachine<CodeletSequence>,
+    sm: StateMachine<SequenceGroupExec>,
     next_transition: Option<Transition>,
     max_step_count: Option<usize>,
     num_steps: usize,
@@ -241,5 +260,180 @@ impl ScheduleExecutor {
 
     pub fn statistics(&self) -> HashMap<(String, String), Statistics> {
         self.sm.inner().statistics()
+    }
+}
+
+/// A group of codelet sequences which are executed one after another
+///
+/// The group runs as long as any item in it is running.
+pub(crate) struct SequenceGroupExec {
+    items: Vec<SequenceExec>,
+}
+
+impl SequenceGroupExec {
+    pub fn new<I: IntoIterator<Item = SequenceExec>>(iter: I) -> Self {
+        Self {
+            items: iter.into_iter().collect(),
+        }
+    }
+
+    pub fn setup_task_clocks(&mut self, clocks: TaskClocks) {
+        for item in self.items.iter_mut() {
+            item.setup_task_clocks(clocks.clone());
+        }
+    }
+
+    pub fn statistics(&self) -> HashMap<(String, String), Statistics> {
+        let mut result = HashMap::new();
+        for item in self.items.iter() {
+            result.extend(item.statistics());
+        }
+        result
+    }
+}
+
+impl Lifecycle for SequenceGroupExec {
+    fn cycle(&mut self, transition: Transition) -> Outcome {
+        let mut is_any_skipped = false;
+        let mut is_any_running = false;
+        let mut is_terminated = false;
+        for item in self.items.iter_mut() {
+            match item.cycle(transition)? {
+                OutcomeKind::Skipped => is_any_skipped = true,
+                OutcomeKind::Running => is_any_running = true,
+                OutcomeKind::Terminated => is_terminated = true,
+            }
+        }
+        if is_terminated {
+            TERMINATED
+        } else if is_any_running {
+            RUNNING
+        } else if is_any_skipped {
+            SKIPPED
+        } else {
+            TERMINATED
+        }
+    }
+}
+
+/// Executes a Sequence of nodos.
+pub(crate) struct SequenceExec {
+    name: String,
+    period: Option<Duration>,
+    items: Vec<StateMachine<DynamicVise>>,
+}
+
+impl SequenceExec {
+    pub fn new<I: IntoIterator<Item = DynamicVise>>(
+        name: String,
+        period: Option<Duration>,
+        vises: I,
+    ) -> Self {
+        Self {
+            name,
+            period,
+            items: vises
+                .into_iter()
+                .map(|vise| StateMachine::new(vise))
+                .collect(),
+        }
+    }
+
+    pub fn setup_task_clocks(&mut self, clocks: TaskClocks) {
+        for csm in self.items.iter_mut() {
+            csm.inner_mut().setup_task_clocks(clocks.clone());
+        }
+    }
+
+    pub fn statistics(&self) -> HashMap<(String, String), Statistics> {
+        self.items
+            .iter()
+            .map(|vice| {
+                (
+                    (
+                        vice.inner().name().to_string(),
+                        vice.inner().type_name().to_string(),
+                    ),
+                    vice.inner().statistics().clone(),
+                )
+            })
+            .collect()
+    }
+}
+
+impl Lifecycle for SequenceExec {
+    fn cycle(&mut self, transition: Transition) -> Outcome {
+        let mut result = SequenceExecCycleResult::new();
+
+        let mut is_terminated = false;
+
+        for csm in self.items.iter_mut() {
+            match csm.transition(transition) {
+                Err(err) => {
+                    result.mark(csm.inner(), err.into());
+                }
+                Ok(OutcomeKind::Terminated) => {
+                    is_terminated = true;
+                }
+                Ok(_) => {}
+            }
+        }
+
+        match result.into() {
+            Some(err) => Err(err),
+            None => {
+                if is_terminated {
+                    TERMINATED
+                } else {
+                    RUNNING
+                }
+            }
+        }
+    }
+}
+
+struct SequenceExecCycleResult {
+    maybe: Option<SequenceExecCycleError>,
+}
+
+impl SequenceExecCycleResult {
+    fn new() -> Self {
+        SequenceExecCycleResult { maybe: None }
+    }
+
+    fn mark(&mut self, vise: &DynamicVise, error: Report) {
+        if self.maybe.is_none() {
+            self.maybe = Some(SequenceExecCycleError::new());
+        }
+
+        // SAFETY: `maybe` is cannot be None due to code above
+        self.maybe.as_mut().unwrap().mark(vise, error);
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("SequenceExecCycleError({:?})", self.failures)]
+struct SequenceExecCycleError {
+    failures: Vec<(String, Report)>,
+}
+
+impl SequenceExecCycleError {
+    fn new() -> Self {
+        SequenceExecCycleError {
+            failures: Vec::new(),
+        }
+    }
+
+    fn mark(&mut self, vise: &DynamicVise, error: Report) {
+        self.failures.push((vise.name().to_string(), error));
+    }
+}
+
+impl From<SequenceExecCycleResult> for Option<eyre::Report> {
+    fn from(value: SequenceExecCycleResult) -> Self {
+        match value.maybe {
+            Some(x) => Some(x.into()),
+            None => None,
+        }
     }
 }

@@ -22,6 +22,7 @@ pub mod prelude {
     pub use crate::codelet::Context;
     pub use crate::codelet::Instantiate;
     pub use crate::codelet::IntoInstance;
+    pub use crate::codelet::Sequence;
     pub use nodo_core::Acqtime;
     pub use nodo_core::Clock;
     pub use nodo_core::Message;

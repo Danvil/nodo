@@ -1,120 +1,119 @@
-use crate::codelet::*;
-use crate::prelude::*;
-use nodo_core::Report;
-use std::collections::HashMap;
+// Copyright 2024 by David Weikersdorfer. All rights reserved.
 
-/// A sequence of executables
-///
-/// The sequence fails/succeeds if any of its elements fails/succeeds.
-pub struct CodeletSequence {
-    items: Vec<StateMachine<DynamicVise>>,
+use crate::codelet::CodeletInstance;
+use crate::codelet::DynamicVise;
+use crate::prelude::Codelet;
+use std::time::Duration;
+
+/// A sequences of nodos (codelet instances) which are executed one after another in the given
+/// order.
+pub struct Sequence {
+    pub(crate) name: String,
+    pub(crate) period: Option<Duration>,
+    pub(crate) vises: Vec<DynamicVise>,
 }
 
-impl CodeletSequence {
-    pub fn new<I: IntoIterator<Item = DynamicVise>>(vises: I) -> Self {
+impl Sequence {
+    /// Create a new sequences
+    #[must_use]
+    pub fn new() -> Self {
         Self {
-            items: vises
-                .into_iter()
-                .map(|vise| StateMachine::new(vise))
-                .collect(),
+            name: String::new(),
+            period: None,
+            vises: Vec::new(),
         }
     }
 
-    pub fn setup_task_clocks(&mut self, clocks: TaskClocks) {
-        for csm in self.items.iter_mut() {
-            csm.inner_mut().setup_task_clocks(clocks.clone());
-        }
+    /// Give the sequences a name for debugging and reporting (builder style)
+    #[must_use]
+    pub fn with_name<S: Into<String>>(mut self, name: S) -> Self {
+        self.name = name.into();
+        self
     }
 
-    pub fn statistics(&self) -> HashMap<(String, String), Statistics> {
-        self.items
-            .iter()
-            .map(|vice| {
-                (
-                    (
-                        vice.inner().name().to_string(),
-                        vice.inner().type_name().to_string(),
-                    ),
-                    vice.inner().statistics().clone(),
-                )
-            })
-            .collect()
+    // TODO implement
+    // #[must_use]
+    // pub fn with_period(mut self, period: Duration) -> Self {
+    //     self.period = Some(period);
+    //     self
+    // }
+
+    /// Add nodos to the sequences (builder style)
+    #[must_use]
+    pub fn with<A: Sequenceable>(mut self, x: A) -> Self {
+        x.append(&mut self);
+        self
     }
-}
 
-impl Lifecycle for CodeletSequence {
-    fn cycle(&mut self, transition: Transition) -> Outcome {
-        let mut result = CodeletSequenceExecuteResult::new();
-
-        let mut is_terminated = false;
-
-        for csm in self.items.iter_mut() {
-            match csm.transition(transition) {
-                Err(err) => {
-                    result.mark(csm.inner(), err.into());
-                }
-                Ok(OutcomeKind::Terminated) => {
-                    is_terminated = true;
-                }
-                Ok(_) => {}
-            }
-        }
-
-        match result.into() {
-            Some(err) => Err(err),
-            None => {
-                if is_terminated {
-                    TERMINATED
-                } else {
-                    RUNNING
-                }
-            }
-        }
+    /// Add nodos to the sequences
+    pub fn append<A: Sequenceable>(&mut self, x: A) {
+        x.append(self);
     }
 }
 
-struct CodeletSequenceExecuteResult {
-    maybe: Option<CodeletSequenceExecuteError>,
+/// Types implementing this trait can be added to a sequence
+pub trait Sequenceable {
+    fn append(self, seq: &mut Sequence);
 }
 
-impl CodeletSequenceExecuteResult {
-    fn new() -> Self {
-        CodeletSequenceExecuteResult { maybe: None }
-    }
-
-    fn mark(&mut self, vise: &DynamicVise, error: Report) {
-        if self.maybe.is_none() {
-            self.maybe = Some(CodeletSequenceExecuteError::new());
-        }
-
-        // SAFETY: `maybe` is cannot be None due to code above
-        self.maybe.as_mut().unwrap().mark(vise, error);
+impl<C: Codelet + 'static> Sequenceable for CodeletInstance<C> {
+    fn append(self, seq: &mut Sequence) {
+        seq.vises.push(DynamicVise::new(self));
     }
 }
 
-#[derive(thiserror::Error, Debug)]
-#[error("CodeletSequenceExecuteError({:?})", self.failures)]
-struct CodeletSequenceExecuteError {
-    failures: Vec<(String, Report)>,
-}
-
-impl CodeletSequenceExecuteError {
-    fn new() -> Self {
-        CodeletSequenceExecuteError {
-            failures: Vec::new(),
-        }
-    }
-
-    fn mark(&mut self, vise: &DynamicVise, error: Report) {
-        self.failures.push((vise.name().to_string(), error));
+impl<T1> Sequenceable for (T1,)
+where
+    T1: Sequenceable,
+{
+    fn append(self, seq: &mut Sequence) {
+        self.0.append(seq);
     }
 }
 
-impl From<CodeletSequenceExecuteResult> for Option<eyre::Report> {
-    fn from(value: CodeletSequenceExecuteResult) -> Self {
-        match value.maybe {
-            Some(x) => Some(x.into()),
-            None => None,
+impl<T1, T2> Sequenceable for (T1, T2)
+where
+    T1: Sequenceable,
+    T2: Sequenceable,
+{
+    fn append(self, seq: &mut Sequence) {
+        self.0.append(seq);
+        self.1.append(seq);
+    }
+}
+
+impl<T1, T2, T3> Sequenceable for (T1, T2, T3)
+where
+    T1: Sequenceable,
+    T2: Sequenceable,
+    T3: Sequenceable,
+{
+    fn append(self, seq: &mut Sequence) {
+        self.0.append(seq);
+        self.1.append(seq);
+        self.2.append(seq);
+    }
+}
+
+impl<T1, T2, T3, T4> Sequenceable for (T1, T2, T3, T4)
+where
+    T1: Sequenceable,
+    T2: Sequenceable,
+    T3: Sequenceable,
+    T4: Sequenceable,
+{
+    fn append(self, seq: &mut Sequence) {
+        self.0.append(seq);
+        self.1.append(seq);
+        self.2.append(seq);
+        self.3.append(seq);
+    }
+}
+
+impl<A: Sequenceable> Sequenceable for Option<A> {
+    fn append(self, seq: &mut Sequence) {
+        if let Some(a) = self {
+            a.append(seq);
         }
     }
 }
