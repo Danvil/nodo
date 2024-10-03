@@ -13,7 +13,9 @@ pub mod prelude {
             connect, Connect, DoubleBufferRx, DoubleBufferTx, OverflowPolicy, Pop, RetentionPolicy,
             Rx, Timeseries, Tx,
         },
-        codelet::{Codelet, Context, Instantiate, IntoInstance, Sequence},
+        codelet::{
+            Codelet, Context, Instantiate, IntoInstance, Schedulable, Sequence, Sequenceable,
+        },
     };
     pub use nodo_core::{
         Acqtime, Clock, Message, Outcome, OutcomeKind, Pubtime, Stamp, WithAcqtime, RUNNING,

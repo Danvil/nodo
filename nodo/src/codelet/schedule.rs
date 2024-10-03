@@ -57,35 +57,40 @@ impl ScheduleBuilder {
         self
     }
 
+    /// Add nodos to the schedule (builder style)
     #[must_use]
     pub fn with<A: Schedulable>(mut self, x: A) -> Self {
         x.schedule(&mut self);
         self
     }
 
-    #[deprecated(note = "Use Sequence instead")]
-    pub fn append<C: Codelet + 'static>(&mut self, instance: CodeletInstance<C>) {
-        self.sequences.push(Sequence {
-            name: "".into(),
-            vises: vec![DynamicVise::new(instance)],
-            period: None,
-        })
+    /// Add nodos to the schedule
+    pub fn append<A: Schedulable>(&mut self, x: A) {
+        x.schedule(self);
     }
 
+    #[deprecated(note = "use 'into' instead")]
     #[must_use]
     pub fn finalize(self) -> ScheduleExecutor {
+        self.into()
+    }
+}
+
+impl From<ScheduleBuilder> for ScheduleExecutor {
+    fn from(builder: ScheduleBuilder) -> Self {
         ScheduleExecutor {
-            name: self.name,
-            thread_id: self.thread_id,
+            name: builder.name,
+            thread_id: builder.thread_id,
             sm: StateMachine::new(SequenceGroupExec::new(
-                self.sequences
+                builder
+                    .sequences
                     .into_iter()
                     .map(|seq| SequenceExec::new(seq.name, seq.period, seq.vises)),
             )),
             next_transition: Some(Transition::Start),
-            max_step_count: self.max_step_count,
+            max_step_count: builder.max_step_count,
             num_steps: 0,
-            period: self.period,
+            period: builder.period,
             last_instant: None,
         }
     }
@@ -98,7 +103,11 @@ pub trait Schedulable {
 
 impl<C: Codelet + 'static> Schedulable for CodeletInstance<C> {
     fn schedule(self, sched: &mut ScheduleBuilder) {
-        sched.append(self);
+        sched.sequences.push(Sequence {
+            name: "".into(),
+            vises: vec![DynamicVise::new(self)],
+            period: None,
+        });
     }
 }
 

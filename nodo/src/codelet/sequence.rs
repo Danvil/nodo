@@ -55,6 +55,13 @@ impl Sequence {
 /// Types implementing this trait can be added to a sequence
 pub trait Sequenceable {
     fn append(self, seq: &mut Sequence);
+
+    fn into_sequence(self) -> Sequence
+    where
+        Self: Sized,
+    {
+        Sequence::new().with(self)
+    }
 }
 
 impl<C: Codelet + 'static> Sequenceable for CodeletInstance<C> {
