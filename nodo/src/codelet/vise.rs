@@ -1,13 +1,7 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::Codelet;
-use crate::codelet::CodeletInstance;
-use crate::codelet::Lifecycle;
-use crate::codelet::Statistics;
-use crate::codelet::TaskClocks;
-use crate::codelet::Transition;
-use nodo_core::Outcome;
-use nodo_core::OutcomeKind;
+use crate::codelet::{Codelet, CodeletInstance, Lifecycle, Statistics, TaskClocks, Transition};
+use nodo_core::{Outcome, OutcomeKind};
 
 /// Wrapper around a codelet with additional information
 pub struct Vise<C: Codelet> {

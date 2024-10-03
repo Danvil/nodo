@@ -1,10 +1,9 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::channels::FlushResult;
-use crate::channels::SyncResult;
-use crate::channels::{RxBundle, TxBundle};
-use crate::codelet::Lifecycle;
-use crate::codelet::{Codelet, Context, TaskClocks, Transition};
+use crate::{
+    channels::{FlushResult, RxBundle, SyncResult, TxBundle},
+    codelet::{Codelet, Context, Lifecycle, TaskClocks, Transition},
+};
 use nodo_core::*;
 
 /// Named instance of a codelet with configuration and channel bundels

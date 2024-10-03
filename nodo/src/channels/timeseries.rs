@@ -1,7 +1,6 @@
 use crate::channels::DoubleBufferRx;
 use core::time::Duration;
-use nodo_core::Message;
-use nodo_core::TimestampKind;
+use nodo_core::{Message, TimestampKind};
 
 #[derive(Clone)]
 pub struct RxChannelTimeseries<'a, T> {
@@ -152,8 +151,7 @@ pub enum FindCriteria {
 
 #[cfg(test)]
 mod tests {
-    use crate::channels::FindCriteria;
-    use crate::prelude::Timeseries;
+    use crate::{channels::FindCriteria, prelude::Timeseries};
     use core::time::Duration;
 
     impl<'a, T: Clone> Timeseries<T> for &'a [(Duration, T)] {

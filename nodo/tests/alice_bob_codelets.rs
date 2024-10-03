@@ -1,9 +1,10 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use nodo::codelet::ScheduleBuilder;
-use nodo::codelet::ScheduleExecutor;
-use nodo::prelude::*;
-use nodo::runtime::Runtime;
+use nodo::{
+    codelet::{ScheduleBuilder, ScheduleExecutor},
+    prelude::*,
+    runtime::Runtime,
+};
 use nodo_std::Terminator;
 use std::time::Duration;
 

@@ -1,10 +1,9 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::Clocks;
-use crate::codelet::ScheduleExecutor;
-use crate::codelet::Statistics;
-use crate::codelet::TaskClocks;
-use crate::sleep::accurate_sleep_until;
+use crate::{
+    codelet::{Clocks, ScheduleExecutor, Statistics, TaskClocks},
+    sleep::accurate_sleep_until,
+};
 use std::collections::HashMap;
 
 pub struct Executor {

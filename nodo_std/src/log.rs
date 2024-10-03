@@ -1,7 +1,6 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use core::fmt::Debug;
-use core::marker::PhantomData;
+use core::{fmt::Debug, marker::PhantomData};
 use nodo::prelude::*;
 
 /// A codelet logs received messages with log crate

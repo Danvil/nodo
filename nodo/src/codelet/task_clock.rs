@@ -1,11 +1,8 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use nodo_core::AcqtimeMarker;
-use nodo_core::AppMonotonicClock;
-use nodo_core::Clock;
-use nodo_core::Pubtime;
-use nodo_core::PubtimeMarker;
-use nodo_core::SysMonotonicClock;
+use nodo_core::{
+    AcqtimeMarker, AppMonotonicClock, Clock, Pubtime, PubtimeMarker, SysMonotonicClock,
+};
 
 /// Task clocks used internally
 #[derive(Clone)]

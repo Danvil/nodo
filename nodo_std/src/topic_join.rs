@@ -1,13 +1,12 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use core::marker::PhantomData;
-use nodo::channels::Rx;
-use nodo::channels::RxBundle;
-use nodo::channels::SyncResult;
-use nodo::codelet::Context;
-use nodo::prelude::*;
-use nodo_core::Topic;
-use nodo_core::WithTopic;
+use nodo::{
+    channels::{Rx, RxBundle, SyncResult},
+    codelet::Context,
+    prelude::*,
+};
+use nodo_core::{Topic, WithTopic};
 
 /// Join has multiple input channels and a single output channel. All messages received on any
 /// input channel are sent to the output channel. There is no particular guarantee on the order

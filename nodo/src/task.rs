@@ -1,13 +1,9 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use core::future::Future;
-use futures::future::BoxFuture;
-use futures::task::ArcWake;
-use futures::FutureExt;
+use futures::{future::BoxFuture, task::ArcWake, FutureExt};
 use nodo_core::Outcome;
-use std::sync::mpsc::SyncSender;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{mpsc::SyncSender, Arc, Mutex};
 
 // /// An task which can be executed asynchronously
 // #[async_trait]

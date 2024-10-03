@@ -2,8 +2,7 @@
 
 use crate::channels::SyncResult;
 use core::ops;
-use std::collections::vec_deque;
-use std::collections::VecDeque;
+use std::collections::{vec_deque, VecDeque};
 
 /// The front stage of StageQueue
 pub struct FrontStage<T> {
@@ -236,11 +235,10 @@ pub enum PushError {
 
 #[cfg(test)]
 mod tests {
-    use crate::channels::BackStage;
-    use crate::channels::FrontStage;
-    use crate::channels::PushError;
-    use crate::channels::SyncResult;
-    use crate::prelude::*;
+    use crate::{
+        channels::{BackStage, FrontStage, PushError, SyncResult},
+        prelude::*,
+    };
 
     pub struct StageQueue<T> {
         back: BackStage<T>,

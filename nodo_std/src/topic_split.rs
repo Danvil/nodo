@@ -1,11 +1,8 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use core::marker::PhantomData;
-use nodo::channels::FlushResult;
-use nodo::codelet::Context;
-use nodo::prelude::*;
-use nodo_core::Topic;
-use nodo_core::WithTopic;
+use nodo::{channels::FlushResult, codelet::Context, prelude::*};
+use nodo_core::{Topic, WithTopic};
 
 /// Reroutes 'WithTopic' messages based on their topic to the right receiver.
 pub struct TopicSplit<T> {

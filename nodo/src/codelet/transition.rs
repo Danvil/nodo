@@ -1,8 +1,9 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use core::fmt;
-use core::ops::Index;
-use core::ops::IndexMut;
+use core::{
+    fmt,
+    ops::{Index, IndexMut},
+};
 
 /// Codelet state transitions
 #[derive(Clone, Copy, PartialEq, Debug)]

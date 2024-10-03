@@ -1,12 +1,8 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use nodo::codelet::Codelet;
-use nodo::codelet::CodeletInstance;
-use nodo::codelet::Instantiate;
-use nodo_core::EyreResult;
-use nodo_core::WrapErr;
-use std::fs::File;
-use std::io::BufReader;
+use nodo::codelet::{Codelet, CodeletInstance, Instantiate};
+use nodo_core::{EyreResult, WrapErr};
+use std::{fs::File, io::BufReader};
 
 /// Codelets which can be instantiated with configuration loaded from a JSON file
 pub trait InstantiateFromJson: Codelet + Sized {

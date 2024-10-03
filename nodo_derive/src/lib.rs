@@ -1,10 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::parse_macro_input;
-use syn::Data;
-use syn::DataStruct;
-use syn::DeriveInput;
-use syn::Fields;
+use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Fields};
 
 /// Derive macro to implement the RxBundle trait for a custom struct with Rx fields
 #[proc_macro_derive(RxBundleDerive)]

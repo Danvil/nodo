@@ -1,7 +1,6 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::EyreResult;
-use crate::Message;
+use crate::{EyreResult, Message};
 
 /// A message with a topic. Used by certain codelets to identify messages.
 #[derive(Clone)]

@@ -1,6 +1,4 @@
-use crate::Acqtime;
-use crate::Stamp;
-use crate::WithAcqtime;
+use crate::{Acqtime, Stamp, WithAcqtime};
 
 /// A data value with timestamps and sequence number
 #[derive(Debug, Clone)]

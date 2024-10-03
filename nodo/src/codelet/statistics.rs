@@ -1,10 +1,8 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::Transition;
-use crate::codelet::TransitionMap;
+use crate::codelet::{Transition, TransitionMap};
 use core::time::Duration;
-use std::collections::HashMap;
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 #[derive(Debug, Clone)]
 pub struct Statistics {

@@ -2,8 +2,7 @@
 
 use core::marker::PhantomData;
 use nodo::prelude::*;
-use nodo_core::BinaryFormat;
-use nodo_core::SerializedMessage;
+use nodo_core::{BinaryFormat, SerializedMessage};
 
 /// A codelet which serializes a message
 pub struct Serializer<T, BF> {

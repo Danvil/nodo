@@ -1,18 +1,13 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::EyreResult;
-use crate::NngPubSubHeader;
-use log::error;
-use log::info;
-use log::trace;
-use nng::options::protocol::pubsub::Subscribe;
-use nng::options::Options;
-use nng::Protocol;
-use nng::Socket;
+use crate::{EyreResult, NngPubSubHeader};
+use log::{error, info, trace};
+use nng::{
+    options::{protocol::pubsub::Subscribe, Options},
+    Protocol, Socket,
+};
 use nodo::prelude::*;
-use nodo_core::eyre;
-use nodo_core::Topic;
-use nodo_core::WithTopic;
+use nodo_core::{eyre, Topic, WithTopic};
 
 /// Codelet which receives serialized messages and writes them to MCAP
 pub struct NngSub {

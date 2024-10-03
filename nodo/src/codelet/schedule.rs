@@ -1,20 +1,15 @@
 // Copyright 2024 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::vise::ViseTrait;
-use crate::codelet::CodeletInstance;
-use crate::codelet::DynamicVise;
-use crate::codelet::Lifecycle;
-use crate::codelet::StateMachine;
-use crate::codelet::Statistics;
-use crate::codelet::TaskClocks;
-use crate::codelet::Transition;
-use crate::prelude::Codelet;
-use crate::prelude::Sequence;
+use crate::{
+    codelet::{
+        vise::ViseTrait, CodeletInstance, DynamicVise, Lifecycle, StateMachine, Statistics,
+        TaskClocks, Transition,
+    },
+    prelude::{Codelet, Sequence},
+};
 use core::time::Duration;
-use nodo_core::Report;
-use nodo_core::*;
-use std::collections::HashMap;
-use std::time::Instant;
+use nodo_core::{Report, *};
+use std::{collections::HashMap, time::Instant};
 
 /// A helper type to build a schedule
 pub struct ScheduleBuilder {

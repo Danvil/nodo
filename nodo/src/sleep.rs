@@ -1,7 +1,6 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use std::time::Duration;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Sleeps for a certain duration with high accuracy potentially using a spin loop
 pub fn accurate_sleep(duration: Duration) {
@@ -30,8 +29,7 @@ fn accurate_sleep_impl(target: Instant, duration: Duration) {
 
 #[cfg(test)]
 mod tests {
-    use crate::sleep::accurate_sleep;
-    use crate::sleep::accurate_sleep_until;
+    use crate::sleep::{accurate_sleep, accurate_sleep_until};
     use core::time::Duration;
     use std::time::Instant;
 

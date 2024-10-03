@@ -1,8 +1,9 @@
 // Copyright 2024 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::CodeletInstance;
-use crate::codelet::DynamicVise;
-use crate::prelude::Codelet;
+use crate::{
+    codelet::{CodeletInstance, DynamicVise},
+    prelude::Codelet,
+};
 use std::time::Duration;
 
 /// A sequences of nodos (codelet instances) which are executed one after another in the given

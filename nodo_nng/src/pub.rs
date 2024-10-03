@@ -1,14 +1,10 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::NngPubSubHeader;
-use log::error;
-use log::info;
-use log::trace;
-use nng::Protocol;
-use nng::Socket;
+use log::{error, info, trace};
+use nng::{Protocol, Socket};
 use nodo::prelude::*;
-use nodo_core::Topic;
-use nodo_core::WithTopic;
+use nodo_core::{Topic, WithTopic};
 
 /// Codelet which receives serialized messages and writes them to MCAP
 pub struct NngPub {

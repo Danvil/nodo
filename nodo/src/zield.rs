@@ -1,9 +1,10 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use core::future::Future;
-use core::pin::Pin;
-use core::task::Context;
-use core::task::Poll;
+use core::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 #[inline]
 pub async fn zield() {

@@ -1,11 +1,8 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::codelet::Transition;
-use core::fmt::Debug;
-use core::fmt::Formatter;
-use nodo_core::Outcome;
-use nodo_core::OutcomeKind;
-use nodo_core::Report;
+use core::fmt::{Debug, Formatter};
+use nodo_core::{Outcome, OutcomeKind, Report};
 
 pub trait Lifecycle {
     /// Applies a lifecycel change

@@ -1,8 +1,6 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use core::marker::PhantomData;
-use core::ops;
-use core::time::Duration;
+use core::{marker::PhantomData, ops, time::Duration};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

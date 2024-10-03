@@ -1,17 +1,11 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use core::marker::PhantomData;
-use nodo::channels::DoubleBufferRx;
-use nodo::channels::DoubleBufferTx;
-use nodo::channels::FlushResult;
-use nodo::channels::Pop;
-use nodo::channels::SyncResult;
-use nodo::channels::{Rx, Tx};
-use nodo::codelet::Codelet;
-use nodo::codelet::Context;
-use nodo_core::ensure;
-use nodo_core::Outcome;
-use nodo_core::SUCCESS;
+use nodo::{
+    channels::{DoubleBufferRx, DoubleBufferTx, FlushResult, Pop, Rx, SyncResult, Tx},
+    codelet::{Codelet, Context},
+};
+use nodo_core::{ensure, Outcome, SUCCESS};
 
 /// A multiplexer has multiple input inputs and a single output channel. Messages received on
 /// the selected input channel are send on the output channel and messages on other inputs are

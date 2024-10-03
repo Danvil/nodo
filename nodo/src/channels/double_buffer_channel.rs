@@ -1,23 +1,19 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::channels::BackStage;
-use crate::channels::ConnectionCheck;
-use crate::channels::FlushResult;
-use crate::channels::FrontStage;
-use crate::channels::OverflowPolicy;
-use crate::channels::RxBundle;
-use crate::channels::RxChannelTimeseries;
-use crate::channels::SyncResult;
-use crate::channels::TxBundle;
-use crate::channels::{Rx, Tx};
-use crate::prelude::RetentionPolicy;
+use crate::{
+    channels::{
+        BackStage, ConnectionCheck, FlushResult, FrontStage, OverflowPolicy, Rx, RxBundle,
+        RxChannelTimeseries, SyncResult, Tx, TxBundle,
+    },
+    prelude::RetentionPolicy,
+};
 use core::ops;
-use nodo_core::Message;
-use nodo_core::TimestampKind;
-use std::collections::vec_deque;
-use std::fmt;
-use std::sync::Arc;
-use std::sync::RwLock;
+use nodo_core::{Message, TimestampKind};
+use std::{
+    collections::vec_deque,
+    fmt,
+    sync::{Arc, RwLock},
+};
 
 /// The maximum number of receivers which can be connected to a single transmitter. This is a
 /// technical limitation as some error codes use 64-bit bitmasks.
@@ -499,9 +495,10 @@ impl std::error::Error for RxRecvError {}
 
 #[cfg(test)]
 mod tests {
-    use crate::channels::FlushResult;
-    use crate::channels::SyncResult;
-    use crate::prelude::*;
+    use crate::{
+        channels::{FlushResult, SyncResult},
+        prelude::*,
+    };
     use std::sync::mpsc;
 
     fn fixed_channel<T: Clone + Send + Sync>(

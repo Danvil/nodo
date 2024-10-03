@@ -1,8 +1,6 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::channels::FlushResult;
-use crate::channels::SyncResult;
-use crate::channels::MAX_RECEIVER_COUNT;
+use crate::channels::{FlushResult, SyncResult, MAX_RECEIVER_COUNT};
 use paste::paste;
 
 /// An endpoint receiving data

@@ -1,8 +1,8 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::statistics_pretty_print;
-use crate::codelet::Executor as CodeletExecutor;
-use crate::codelet::ScheduleExecutor as CodeletSchedule;
+use crate::codelet::{
+    statistics_pretty_print, Executor as CodeletExecutor, ScheduleExecutor as CodeletSchedule,
+};
 use core::time::Duration;
 use std::sync::mpsc::RecvTimeoutError;
 

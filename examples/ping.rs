@@ -1,9 +1,6 @@
 use core::time::Duration;
-use nodo::codelet::ScheduleBuilder;
-use nodo::prelude::*;
-use nodo::runtime::Runtime;
-use nodo_std::Sink;
-use nodo_std::Source;
+use nodo::{codelet::ScheduleBuilder, prelude::*, runtime::Runtime};
+use nodo_std::{Sink, Source};
 
 #[derive(Debug, Clone)]
 struct Ping;

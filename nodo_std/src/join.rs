@@ -1,14 +1,11 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use core::marker::PhantomData;
-use nodo::channels::DoubleBufferRx;
-use nodo::channels::DoubleBufferTx;
-use nodo::channels::Rx;
-use nodo::channels::SyncResult;
-use nodo::codelet::Codelet;
-use nodo::codelet::Context;
-use nodo_core::Outcome;
-use nodo_core::SUCCESS;
+use nodo::{
+    channels::{DoubleBufferRx, DoubleBufferTx, Rx, SyncResult},
+    codelet::{Codelet, Context},
+};
+use nodo_core::{Outcome, SUCCESS};
 
 #[derive(Default)]
 pub struct JoinConfig {

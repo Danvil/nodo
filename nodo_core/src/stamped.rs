@@ -1,9 +1,7 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::Timestamp;
-use core::fmt;
-use core::ops;
-use core::time::Duration;
+use core::{fmt, ops, time::Duration};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]

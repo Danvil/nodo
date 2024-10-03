@@ -1,16 +1,10 @@
-use core::marker::PhantomData;
-use core::time::Duration;
-use nodo::codelet::CodeletInstance;
-use nodo::codelet::ScheduleBuilder;
-use nodo::codelet::ScheduleExecutor;
-use nodo::prelude::*;
-use nodo_core::BinaryFormat;
-use nodo_core::EyreResult;
-use nodo_core::Schema;
-use nodo_std::Serializer;
-use nodo_std::SerializerConfig;
-use nodo_std::TopicJoin;
-use nodo_std::TopicJoinConfig;
+use core::{marker::PhantomData, time::Duration};
+use nodo::{
+    codelet::{CodeletInstance, ScheduleBuilder, ScheduleExecutor},
+    prelude::*,
+};
+use nodo_core::{BinaryFormat, EyreResult, Schema};
+use nodo_std::{Serializer, SerializerConfig, TopicJoin, TopicJoinConfig};
 use serde::{Deserialize, Serialize};
 
 mod r#pub;
@@ -120,29 +114,19 @@ impl Publisher {
 
 #[cfg(test)]
 mod tests {
-    use crate::Bincode;
-    use crate::NngPub;
-    use crate::NngPubConfig;
-    use crate::NngSub;
-    use crate::NngSubConfig;
+    use crate::{Bincode, NngPub, NngPubConfig, NngSub, NngSubConfig};
     use core::time::Duration;
-    use nodo::prelude::*;
-    use nodo::runtime::Runtime;
-    use nodo::runtime::RuntimeControl;
+    use nodo::{
+        prelude::*,
+        runtime::{Runtime, RuntimeControl},
+    };
     use nodo_core::WithTopic;
-    use nodo_std::Deserializer;
-    use nodo_std::DeserializerConfig;
-    use nodo_std::Log;
-    use nodo_std::Pipe;
-    use nodo_std::PipeConfig;
-    use nodo_std::Serializer;
-    use nodo_std::SerializerConfig;
-    use nodo_std::Sink;
-    use nodo_std::Source;
-    use serde::Deserialize;
-    use serde::Serialize;
-    use std::sync::Arc;
-    use std::sync::RwLock;
+    use nodo_std::{
+        Deserializer, DeserializerConfig, Log, Pipe, PipeConfig, Serializer, SerializerConfig,
+        Sink, Source,
+    };
+    use serde::{Deserialize, Serialize};
+    use std::sync::{Arc, RwLock};
 
     #[test]
     fn test_pub_sub() {
