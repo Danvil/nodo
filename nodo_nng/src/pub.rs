@@ -39,7 +39,7 @@ impl Codelet for NngPub {
         (
             DoubleBufferRx::new(
                 OverflowPolicy::Forget(cfg.queue_size),
-                RetentionPolicy::Keep,
+                RetentionPolicy::Drop,
             ),
             (),
         )
