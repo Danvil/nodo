@@ -173,6 +173,12 @@ impl<A: Schedulable> Schedulable for Option<A> {
     }
 }
 
+impl<A: Schedulable> Schedulable for Box<A> {
+    fn schedule(self, sched: &mut ScheduleBuilder) {
+        (*self).schedule(sched);
+    }
+}
+
 /// A schedule of codelets to be executed
 #[derive(Debug)]
 pub struct ScheduleExecutor {

@@ -125,3 +125,9 @@ impl<A: Sequenceable> Sequenceable for Option<A> {
         }
     }
 }
+
+impl<A: Sequenceable> Sequenceable for Box<A> {
+    fn append(self, seq: &mut Sequence) {
+        (*self).append(seq);
+    }
+}
