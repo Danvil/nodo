@@ -35,6 +35,7 @@ impl Codelet for NngSub {
     type Tx = DoubleBufferTx<Message<WithTopic<Vec<u8>>>>;
 
     fn build_bundles(cfg: &Self::Config) -> (Self::Rx, Self::Tx) {
+        assert!(cfg.queue_size > 0, "queue_size must be at least 1");
         ((), DoubleBufferTx::new(cfg.queue_size))
     }
 
@@ -71,13 +72,20 @@ impl Codelet for NngSub {
         SUCCESS
     }
 
-    fn step(&mut self, _cx: &Context<Self>, _rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
+    fn step(&mut self, cx: &Context<Self>, _rx: &mut Self::Rx, tx: &mut Self::Tx) -> Outcome {
         // SAFETY: guaranteed by start
         let socket = self.socket.as_mut().unwrap();
 
         let mut received_count = 0;
 
         loop {
+            if received_count == cx.config.queue_size {
+                log::warn!(
+                    "codelet can not keep up with reading data from socket. considering increasing queue size"
+                );
+                break;
+            }
+
             match socket.try_recv() {
                 Ok(buff) => match Self::parse(buff) {
                     Ok(msg) => {
