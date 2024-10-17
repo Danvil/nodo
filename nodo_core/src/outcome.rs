@@ -13,7 +13,7 @@ pub enum DefaultStatus {
     /// Skipped steps are counted separately in statistics and other tools.
     Skipped,
 
-    /// The codelet executed work and is still running.
+    /// The codelet executed work.
     Running,
 }
 

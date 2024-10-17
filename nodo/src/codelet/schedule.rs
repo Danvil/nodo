@@ -2,12 +2,13 @@
 
 use crate::{
     codelet::{
-        vise::ViseTrait, CodeletInstance, DynamicVise, Lifecycle, StateMachine, Statistics,
-        TaskClocks, Transition,
+        vise::ViseTrait, CodeletInstance, CodeletStatus, DynamicVise, Lifecycle, StateMachine,
+        Statistics, TaskClocks, Transition,
     },
     prelude::{Codelet, Sequence},
 };
 use core::time::Duration;
+use eyre::Result;
 use nodo_core::{Report, *};
 use std::{collections::HashMap, time::Instant};
 
@@ -300,7 +301,7 @@ impl SequenceGroupExec {
 }
 
 impl Lifecycle for SequenceGroupExec {
-    fn cycle(&mut self, transition: Transition) -> Outcome {
+    fn cycle(&mut self, transition: Transition) -> Result<OutcomeKind> {
         let mut is_any_running = false;
         for item in self.items.iter_mut() {
             match item.cycle(transition)? {

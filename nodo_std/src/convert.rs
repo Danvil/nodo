@@ -21,6 +21,7 @@ where
     T: Send + Sync,
     S: Clone + Send + Sync + From<T>,
 {
+    type Status = DefaultStatus;
     type Config = ();
     type Rx = DoubleBufferRx<T>;
     type Tx = DoubleBufferTx<S>;

@@ -14,12 +14,13 @@ pub mod prelude {
             Rx, Timeseries, Tx,
         },
         codelet::{
-            Codelet, Context, Instantiate, IntoInstance, Schedulable, Sequence, Sequenceable,
+            Codelet, CodeletStatus, Context, Instantiate, IntoInstance, Schedulable, Sequence,
+            Sequenceable,
         },
     };
     pub use nodo_core::{
-        Acqtime, Clock, Message, Outcome, OutcomeKind, Pubtime, Stamp, WithAcqtime, RUNNING,
-        SKIPPED, SUCCESS,
+        Acqtime, Clock, DefaultStatus, Message, Outcome, OutcomeKind, Pubtime, Stamp, WithAcqtime,
+        RUNNING, SKIPPED, SUCCESS,
     };
-    pub use nodo_derive::{RxBundleDerive, TxBundleDerive};
+    pub use nodo_derive::{RxBundleDerive, Status, TxBundleDerive};
 }

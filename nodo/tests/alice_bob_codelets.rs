@@ -25,6 +25,7 @@ struct AliceTx {
 }
 
 impl Codelet for Alice {
+    type Status = DefaultStatus;
     type Config = ();
     type Rx = ();
     type Tx = AliceTx;
@@ -60,6 +61,7 @@ struct BobRx {
 }
 
 impl Codelet for Bob {
+    type Status = DefaultStatus;
     type Config = ();
     type Rx = BobRx;
     type Tx = ();

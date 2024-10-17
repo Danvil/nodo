@@ -1,10 +1,7 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use core::marker::PhantomData;
-use nodo::{
-    channels::{DoubleBufferRx, DoubleBufferTx, Rx, SyncResult},
-    codelet::{Codelet, Context},
-};
+use nodo::{channels::SyncResult, prelude::*};
 use nodo_core::{Outcome, SUCCESS};
 
 #[derive(Default)]
@@ -24,6 +21,7 @@ impl<T: Send + Sync + Clone> Default for Join<T> {
 }
 
 impl<T: Send + Sync + Clone> Codelet for Join<T> {
+    type Status = DefaultStatus;
     type Config = JoinConfig;
     type Rx = JoinRx<T>;
     type Tx = DoubleBufferTx<T>;

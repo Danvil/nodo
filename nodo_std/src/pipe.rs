@@ -27,6 +27,7 @@ where
     S: Clone + Send + Sync,
     F: FnMut(T) -> S + Send,
 {
+    type Status = DefaultStatus;
     type Config = PipeConfig;
     type Rx = DoubleBufferRx<T>;
     type Tx = DoubleBufferTx<S>;

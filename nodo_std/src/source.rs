@@ -23,6 +23,7 @@ where
     T: Send + Sync + Clone,
     F: FnMut() -> T + Send,
 {
+    type Status = DefaultStatus;
     type Config = ();
     type Rx = ();
     type Tx = DoubleBufferTx<T>;

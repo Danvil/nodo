@@ -28,6 +28,7 @@ impl<T> Cloner<T> {
 }
 
 impl<T: Clone + Send + Sync> Codelet for Cloner<T> {
+    type Status = DefaultStatus;
     type Config = ();
     type Rx = ();
     type Tx = DoubleBufferTx<Message<T>>;

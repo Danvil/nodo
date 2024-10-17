@@ -30,6 +30,7 @@ impl<T> Codelet for TopicJoin<T>
 where
     T: Clone + Send + Sync,
 {
+    type Status = DefaultStatus;
     type Config = TopicJoinConfig;
     type Rx = TopicJoinRx<Message<T>>;
     type Tx = DoubleBufferTx<Message<WithTopic<T>>>;

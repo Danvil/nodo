@@ -27,6 +27,7 @@ impl Default for NngPub {
 }
 
 impl Codelet for NngPub {
+    type Status = DefaultStatus;
     type Config = NngPubConfig;
     type Rx = DoubleBufferRx<Message<WithTopic<Vec<u8>>>>;
     type Tx = ();

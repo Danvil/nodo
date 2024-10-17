@@ -1,7 +1,8 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::codelet::{Codelet, CodeletInstance, Lifecycle, Statistics, TaskClocks, Transition};
-use nodo_core::{Outcome, OutcomeKind};
+use eyre::Result;
+use nodo_core::OutcomeKind;
 
 /// Wrapper around a codelet with additional information
 pub struct Vise<C: Codelet> {
@@ -24,16 +25,16 @@ impl<C: Codelet> Vise<C> {
 }
 
 impl<C: Codelet> Lifecycle for Vise<C> {
-    fn cycle(&mut self, transition: Transition) -> Outcome {
+    fn cycle(&mut self, transition: Transition) -> Result<OutcomeKind> {
         let stats = &mut self.statistics.transitions[transition];
         stats.begin();
 
-        let outcome = self.instance.cycle(transition);
+        let outcome = self.instance.cycle(transition)?;
 
-        let skipped = matches!(outcome, Ok(OutcomeKind::Skipped));
+        let skipped = outcome == OutcomeKind::Skipped;
         stats.end(skipped);
 
-        return outcome;
+        Ok(outcome)
     }
 }
 
@@ -96,7 +97,7 @@ impl ViseTrait for DynamicVise {
 }
 
 impl Lifecycle for DynamicVise {
-    fn cycle(&mut self, transition: Transition) -> Outcome {
+    fn cycle(&mut self, transition: Transition) -> Result<OutcomeKind> {
         self.0.cycle(transition)
     }
 }

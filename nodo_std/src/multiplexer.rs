@@ -2,8 +2,8 @@
 
 use core::marker::PhantomData;
 use nodo::{
-    channels::{DoubleBufferRx, DoubleBufferTx, FlushResult, Pop, Rx, SyncResult, Tx},
-    codelet::{Codelet, Context},
+    channels::{FlushResult, SyncResult},
+    prelude::*,
 };
 use nodo_core::{ensure, Outcome, SUCCESS};
 
@@ -125,6 +125,7 @@ impl<T: Send + Sync + Clone> nodo::channels::TxBundle for MultiplexerTx<T> {
 }
 
 impl<T: Send + Sync + Clone> Codelet for Multiplexer<T> {
+    type Status = DefaultStatus;
     type Config = MultiplexerConfig;
     type Rx = MultiplexerRx<T>;
     type Tx = MultiplexerTx<T>;

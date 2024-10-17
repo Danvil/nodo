@@ -18,6 +18,7 @@ impl<T: Send + Sync + Clone> Default for TopicSplit<T> {
 }
 
 impl<T: Send + Sync + Clone> Codelet for TopicSplit<T> {
+    type Status = DefaultStatus;
     type Config = ();
     type Rx = DoubleBufferRx<Message<WithTopic<T>>>;
     type Tx = TopicSplitTx<Message<T>>;

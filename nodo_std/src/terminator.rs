@@ -18,6 +18,7 @@ impl Terminator {
 }
 
 impl Codelet for Terminator {
+    type Status = DefaultStatus;
     type Config = ();
     type Rx = ();
     type Tx = ();

@@ -2,8 +2,9 @@
 
 use crate::{
     channels::{FlushResult, RxBundle, SyncResult, TxBundle},
-    codelet::{Codelet, Context, Lifecycle, TaskClocks, Transition},
+    codelet::{Codelet, CodeletStatus, Context, Lifecycle, TaskClocks, Transition},
 };
+use eyre::Result;
 use nodo_core::*;
 
 /// Named instance of a codelet with configuration and channel bundels
@@ -18,6 +19,7 @@ pub struct CodeletInstance<C: Codelet> {
     pub(crate) is_scheduled: bool,
     pub(crate) rx_sync_results: Vec<SyncResult>,
     pub(crate) tx_flush_results: Vec<FlushResult>,
+    pub(crate) status: Option<C::Status>,
 }
 
 impl<C: Codelet> Drop for CodeletInstance<C> {
@@ -47,6 +49,7 @@ impl<C: Codelet> CodeletInstance<C> {
             is_scheduled: false,
             rx_sync_results: vec![SyncResult::ZERO; rx_count],
             tx_flush_results: vec![FlushResult::ZERO; tx_count],
+            status: None,
         }
     }
 
@@ -62,7 +65,7 @@ impl<C: Codelet> CodeletInstance<C> {
         self
     }
 
-    pub fn start(&mut self) -> Outcome {
+    pub fn start(&mut self) -> Result<C::Status> {
         profiling::scope!(&format!("{}_start", self.name));
 
         log::trace!("'{}' start begin", self.name);
@@ -99,7 +102,7 @@ impl<C: Codelet> CodeletInstance<C> {
 
         self.clocks.as_mut().unwrap().on_codelet_start();
 
-        let outcome = self.state.start(
+        let status = self.state.start(
             &Context {
                 clock: &self.clocks.as_ref().unwrap().deprecated_task_clock,
                 clocks: &self.clocks.as_ref().unwrap(),
@@ -111,11 +114,11 @@ impl<C: Codelet> CodeletInstance<C> {
 
         self.flush()?;
 
-        log::trace!("'{}' start end ({outcome:?})", self.name);
-        Ok(outcome)
+        log::trace!("'{}' start end ({})", self.name, status.label());
+        Ok(status)
     }
 
-    pub fn stop(&mut self) -> Outcome {
+    pub fn stop(&mut self) -> Result<C::Status> {
         profiling::scope!(&format!("{}_stop", self.name));
         log::trace!("'{}' stop begin", self.name);
 
@@ -123,7 +126,7 @@ impl<C: Codelet> CodeletInstance<C> {
 
         self.clocks.as_mut().unwrap().on_codelet_stop();
 
-        let outcome = self.state.stop(
+        let status = self.state.stop(
             &Context {
                 clock: &self.clocks.as_ref().unwrap().deprecated_task_clock,
                 clocks: &self.clocks.as_ref().unwrap(),
@@ -135,11 +138,11 @@ impl<C: Codelet> CodeletInstance<C> {
 
         self.flush()?;
 
-        log::trace!("'{}' stop end ({outcome:?})", self.name);
-        Ok(outcome)
+        log::trace!("'{}' stop end ({})", self.name, status.label());
+        Ok(status)
     }
 
-    pub fn step(&mut self) -> Outcome {
+    pub fn step(&mut self) -> Result<C::Status> {
         profiling::scope!(&format!("{}_step", self.name));
         log::trace!("'{}' step begin", self.name);
 
@@ -147,7 +150,7 @@ impl<C: Codelet> CodeletInstance<C> {
 
         self.clocks.as_mut().unwrap().on_codelet_step();
 
-        let outcome = self.state.step(
+        let status = self.state.step(
             &Context {
                 clock: &self.clocks.as_ref().unwrap().deprecated_task_clock,
                 clocks: &self.clocks.as_ref().unwrap(),
@@ -159,19 +162,19 @@ impl<C: Codelet> CodeletInstance<C> {
 
         self.flush()?;
 
-        log::trace!("'{}' step end ({outcome:?})", self.name);
-        Ok(outcome)
+        log::trace!("'{}' step end ({})", self.name, status.label());
+        Ok(status)
     }
 
-    pub fn pause(&mut self) -> Outcome {
+    pub fn pause(&mut self) -> Result<C::Status> {
         self.state.pause()
     }
 
-    pub fn resume(&mut self) -> Outcome {
+    pub fn resume(&mut self) -> Result<C::Status> {
         self.state.resume()
     }
 
-    fn sync(&mut self) -> Result<(), eyre::Report> {
+    fn sync(&mut self) -> Result<()> {
         // For some codelets the TX channel count might change dynamically
         self.rx_sync_results.resize(self.rx.len(), SyncResult::ZERO);
 
@@ -186,7 +189,7 @@ impl<C: Codelet> CodeletInstance<C> {
         Ok(())
     }
 
-    fn flush(&mut self) -> Result<(), eyre::Report> {
+    fn flush(&mut self) -> Result<()> {
         // For some codelets the TX channel count might change dynamically
         self.tx_flush_results
             .resize(self.tx.len(), FlushResult::ZERO);
@@ -208,13 +211,16 @@ impl<C: Codelet> CodeletInstance<C> {
 }
 
 impl<C: Codelet> Lifecycle for CodeletInstance<C> {
-    fn cycle(&mut self, transition: Transition) -> Outcome {
-        match transition {
+    fn cycle(&mut self, transition: Transition) -> Result<DefaultStatus> {
+        let status = match transition {
             Transition::Start => self.start(),
             Transition::Step => self.step(),
             Transition::Stop => self.stop(),
             Transition::Pause => self.pause(),
             Transition::Resume => self.resume(),
-        }
+        }?;
+        let simplified_status = status.as_default_status();
+        self.status = Some(status);
+        Ok(simplified_status)
     }
 }

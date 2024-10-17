@@ -28,6 +28,7 @@ impl<T> Default for Log<T> {
 }
 
 impl<T: Send + Sync + Debug> Codelet for Log<T> {
+    type Status = DefaultStatus;
     type Config = ();
     type Rx = DoubleBufferRx<T>;
     type Tx = ();

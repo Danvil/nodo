@@ -23,6 +23,7 @@ where
     T: Send + Sync,
     F: FnMut(T) -> Outcome + Send,
 {
+    type Status = DefaultStatus;
     type Config = ();
     type Rx = DoubleBufferRx<T>;
     type Tx = ();

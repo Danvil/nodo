@@ -13,6 +13,7 @@ impl<T> Default for NullRx<T> {
 }
 
 impl<T: Send + Sync + Clone> Codelet for NullRx<T> {
+    type Status = DefaultStatus;
     type Config = ();
     type Rx = DoubleBufferRx<T>;
     type Tx = ();

@@ -2,11 +2,12 @@
 
 use crate::codelet::Transition;
 use core::fmt::{Debug, Formatter};
-use nodo_core::{Outcome, OutcomeKind, Report};
+use eyre::Result;
+use nodo_core::{DefaultStatus, Report};
 
 pub trait Lifecycle {
     /// Applies a lifecycel change
-    fn cycle(&mut self, transition: Transition) -> Outcome;
+    fn cycle(&mut self, transition: Transition) -> Result<DefaultStatus>;
 }
 
 /// Possible states of codelets
@@ -83,7 +84,7 @@ impl<C> StateMachine<C> {
         self.state.transition(request).is_some()
     }
 
-    pub fn transition(&mut self, transition: Transition) -> Result<OutcomeKind, TransitionError>
+    pub fn transition(&mut self, transition: Transition) -> Result<DefaultStatus, TransitionError>
     where
         C: Lifecycle,
     {

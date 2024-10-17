@@ -30,6 +30,7 @@ impl Default for NngSub {
 }
 
 impl Codelet for NngSub {
+    type Status = DefaultStatus;
     type Config = NngSubConfig;
     type Rx = ();
     type Tx = DoubleBufferTx<Message<WithTopic<Vec<u8>>>>;

@@ -35,6 +35,7 @@ where
     T: Send + Sync + Clone,
     BF: Send + BinaryFormat<T>,
 {
+    type Status = DefaultStatus;
     type Config = DeserializerConfig;
     type Rx = DoubleBufferRx<Message<Vec<u8>>>;
     type Tx = DoubleBufferTx<Message<T>>;
