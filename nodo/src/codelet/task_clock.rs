@@ -6,7 +6,7 @@ use nodo_core::{
 
 /// Task clocks used internally
 #[derive(Clone)]
-pub(crate) struct Clocks {
+pub struct Clocks {
     /// Application-wide mononotic clock starting when the application starts
     pub app_mono: AppMonotonicClock<PubtimeMarker>,
 
@@ -15,7 +15,7 @@ pub(crate) struct Clocks {
 }
 
 impl Clocks {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             app_mono: AppMonotonicClock::new(),
             sys_mono: SysMonotonicClock::new(),
@@ -39,7 +39,7 @@ pub struct TaskClocks {
 }
 
 impl TaskClocks {
-    pub(crate) fn from(clocks: Clocks) -> Self {
+    pub fn from(clocks: Clocks) -> Self {
         Self {
             app_mono: clocks.app_mono.clone(),
             sys_mono: clocks.sys_mono.clone(),

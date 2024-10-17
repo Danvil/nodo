@@ -1,6 +1,6 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use nodo::{prelude::*, runtime::RuntimeControl};
+use nodo::prelude::*;
 
 /// Terminates after certain number of steps.
 pub struct Terminator {

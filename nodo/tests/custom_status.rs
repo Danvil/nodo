@@ -2,7 +2,8 @@
 
 use core::time::Duration;
 use eyre::Result;
-use nodo::{codelet::ScheduleBuilder, prelude::*, runtime::Runtime};
+use nodo::{codelet::ScheduleBuilder, prelude::*};
+use nodo_runtime::Runtime;
 use nodo_std::Terminator;
 
 #[derive(Clone)]

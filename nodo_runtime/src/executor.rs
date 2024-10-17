@@ -1,9 +1,7 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::{
-    codelet::{Clocks, ScheduleExecutor, Statistics, TaskClocks},
-    sleep::accurate_sleep_until,
-};
+use crate::{accurate_sleep_until, ScheduleExecutor};
+use nodo::codelet::{Clocks, Statistics, TaskClocks};
 use std::collections::HashMap;
 
 pub struct Executor {

@@ -15,3 +15,4 @@ serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 env_logger = "0.10"
+nodo_runtime = { path = "../nodo_runtime" }

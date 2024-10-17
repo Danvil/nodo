@@ -2,8 +2,7 @@
 
 pub mod channels;
 pub mod codelet;
-pub mod runtime;
-pub mod sleep;
+pub mod runtime_control;
 pub mod task;
 pub mod zield;
 
@@ -17,6 +16,7 @@ pub mod prelude {
             Codelet, CodeletStatus, Context, Instantiate, IntoInstance, Schedulable, Sequence,
             Sequenceable,
         },
+        runtime_control::RuntimeControl,
     };
     pub use nodo_core::{
         Acqtime, Clock, DefaultStatus, Message, Outcome, OutcomeKind, Pubtime, Stamp, WithAcqtime,

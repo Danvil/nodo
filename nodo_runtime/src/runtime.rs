@@ -1,22 +1,16 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::{
+use crate::{
     statistics_pretty_print, Executor as CodeletExecutor, ScheduleExecutor as CodeletSchedule,
 };
 use core::time::Duration;
+use nodo::prelude::RuntimeControl;
 use std::sync::mpsc::RecvTimeoutError;
 
 pub struct Runtime {
     tx_control: std::sync::mpsc::SyncSender<RuntimeControl>,
     rx_control: std::sync::mpsc::Receiver<RuntimeControl>,
     codelet_exec: CodeletExecutor,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum RuntimeControl {
-    /// Request the runtime to stop. It may take a while for the runtime to shut down as codelets
-    /// will finish stepping and stop will be called for all active codelets.
-    RequestStop,
 }
 
 impl Runtime {

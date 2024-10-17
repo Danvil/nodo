@@ -1,6 +1,6 @@
 use core::{marker::PhantomData, time::Duration};
 use nodo::{
-    codelet::{CodeletInstance, ScheduleBuilder, ScheduleExecutor},
+    codelet::{CodeletInstance, ScheduleBuilder},
     prelude::*,
 };
 use nodo_core::{BinaryFormat, EyreResult, Schema};
@@ -105,10 +105,8 @@ impl Publisher {
         Ok(())
     }
 
-    pub fn into_schedule(mut self) -> ScheduleExecutor {
-        self.schedule_builder.append(self.join);
-        self.schedule_builder.append(self.nng_pub);
-        self.schedule_builder.finalize()
+    pub fn into_sequence(self) -> Sequence {
+        Sequence::new().with(self.join).with(self.nng_pub)
     }
 }
 
@@ -116,11 +114,9 @@ impl Publisher {
 mod tests {
     use crate::{Bincode, NngPub, NngPubConfig, NngSub, NngSubConfig};
     use core::time::Duration;
-    use nodo::{
-        prelude::*,
-        runtime::{Runtime, RuntimeControl},
-    };
+    use nodo::prelude::*;
     use nodo_core::WithTopic;
+    use nodo_runtime::Runtime;
     use nodo_std::{
         Deserializer, DeserializerConfig, Log, Pipe, PipeConfig, Serializer, SerializerConfig,
         Sink, Source,
@@ -233,7 +229,7 @@ mod tests {
                 .with(de)
                 .with(log)
                 .with(check)
-                .finalize(),
+                .into(),
         );
 
         rt.spin();

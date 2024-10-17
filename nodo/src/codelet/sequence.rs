@@ -9,9 +9,9 @@ use std::time::Duration;
 /// A sequences of nodos (codelet instances) which are executed one after another in the given
 /// order.
 pub struct Sequence {
-    pub(crate) name: String,
-    pub(crate) period: Option<Duration>,
-    pub(crate) vises: Vec<DynamicVise>,
+    pub name: String,
+    pub period: Option<Duration>,
+    pub vises: Vec<DynamicVise>,
 }
 
 impl Sequence {

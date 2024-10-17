@@ -1,20 +1,18 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 mod codelet_instance;
-mod executor;
+mod lifecycle;
 mod schedule;
 mod sequence;
-mod state_machine;
 mod statistics;
 mod task_clock;
 mod transition;
 mod vise;
 
 pub use codelet_instance::*;
-pub use executor::*;
+pub use lifecycle::*;
 pub use schedule::*;
 pub use sequence::*;
-pub use state_machine::*;
 pub use statistics::*;
 pub use task_clock::*;
 pub use transition::*;

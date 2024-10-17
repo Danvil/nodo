@@ -1,10 +1,7 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use nodo::{
-    codelet::{ScheduleBuilder, ScheduleExecutor},
-    prelude::*,
-    runtime::Runtime,
-};
+use nodo::{codelet::ScheduleBuilder, prelude::*};
+use nodo_runtime::{Runtime, ScheduleExecutor};
 use nodo_std::Terminator;
 use std::time::Duration;
 
@@ -120,7 +117,7 @@ fn alice_bob_codelets() {
             .with_max_step_count(NUM_MESSAGES)
             .with(alice)
             .with(bob)
-            .finalize(),
+            .into(),
     );
 }
 
@@ -166,7 +163,7 @@ fn alice_double_bob_codelets() {
             .with(alice)
             .with(bob_1)
             .with(bob_2)
-            .finalize(),
+            .into(),
     );
 }
 
@@ -192,5 +189,5 @@ fn alice_many_bobs_codelets() {
         schedule.append(bob);
     }
 
-    test_schedule(schedule.finalize());
+    test_schedule(schedule.into());
 }

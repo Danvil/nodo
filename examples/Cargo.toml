@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 eyre = "0.6"
 nodo = { path = "../nodo" }
+nodo_runtime = { path = "../nodo_runtime" }
 nodo_std = { path = "../nodo_std" }
 
 [[example]]

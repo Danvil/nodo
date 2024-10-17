@@ -1,5 +1,6 @@
 use core::time::Duration;
-use nodo::{codelet::ScheduleBuilder, prelude::*, runtime::Runtime};
+use nodo::{codelet::ScheduleBuilder, prelude::*};
+use nodo_runtime::Runtime;
 use nodo_std::{Sink, Source};
 
 #[derive(Debug, Clone)]
@@ -23,10 +24,11 @@ fn main() -> eyre::Result<()> {
             .with_period(Duration::from_millis(100))
             .with(source)
             .with(sink)
-            .finalize(),
+            .into(),
     );
 
-    rt.wait_for_ctrl_c();
+    rt.enable_terminate_on_ctrl_c();
+    rt.spin();
 
     Ok(())
 }

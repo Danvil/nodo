@@ -1,14 +1,9 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::Transition;
 use core::fmt::{Debug, Formatter};
 use eyre::Result;
+use nodo::codelet::{Lifecycle, Transition};
 use nodo_core::{DefaultStatus, Report};
-
-pub trait Lifecycle {
-    /// Applies a lifecycel change
-    fn cycle(&mut self, transition: Transition) -> Result<DefaultStatus>;
-}
 
 /// Possible states of codelets
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -116,7 +111,8 @@ impl<C> Debug for StateMachine<C> {
 
 #[cfg(test)]
 mod tests {
-    use crate::codelet::*;
+    use crate::State;
+    use nodo::codelet::*;
 
     #[test]
     fn state_transition() {
