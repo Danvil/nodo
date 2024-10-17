@@ -3,13 +3,8 @@ name = "nodo"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-async-channel = "1.9"
-async-trait = "0.1"
 eyre = "0.6"
-futures = "0.3"
 log = "0.4"
 nodo_core = { path = "../nodo_core"}
 nodo_derive = { path = "../nodo_derive"}

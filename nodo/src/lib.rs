@@ -3,8 +3,6 @@
 pub mod channels;
 pub mod codelet;
 pub mod runtime_control;
-pub mod task;
-pub mod zield;
 
 pub mod prelude {
     pub use crate::{
