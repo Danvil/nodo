@@ -19,7 +19,7 @@ pub mod prelude {
     };
     pub use nodo_core::{
         Acqtime, Clock, Message, Outcome, OutcomeKind, Pubtime, Stamp, WithAcqtime, RUNNING,
-        SKIPPED, SUCCESS, TERMINATED,
+        SKIPPED, SUCCESS,
     };
     pub use nodo_derive::{RxBundleDerive, TxBundleDerive};
 }

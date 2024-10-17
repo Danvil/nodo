@@ -1,15 +1,19 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use nodo::prelude::*;
+use nodo::{prelude::*, runtime::RuntimeControl};
 
 /// Terminates after certain number of steps.
 pub struct Terminator {
     countdown: usize,
+    tx_control: std::sync::mpsc::SyncSender<RuntimeControl>,
 }
 
 impl Terminator {
-    pub fn new(countdown: usize) -> Self {
-        Self { countdown }
+    pub fn new(countdown: usize, tx_control: std::sync::mpsc::SyncSender<RuntimeControl>) -> Self {
+        Self {
+            countdown,
+            tx_control,
+        }
     }
 }
 
@@ -24,7 +28,8 @@ impl Codelet for Terminator {
 
     fn step(&mut self, _: &Context<Self>, _: &mut Self::Rx, _: &mut Self::Tx) -> Outcome {
         if self.countdown == 0 {
-            TERMINATED
+            self.tx_control.send(RuntimeControl::RequestStop)?;
+            SUCCESS
         } else {
             self.countdown -= 1;
             SUCCESS

@@ -126,20 +126,24 @@ fn alice_bob_codelets() {
 fn alice_bob_codelets_with_terminator() {
     init_reporting();
 
-    let term = Terminator::new(NUM_MESSAGES - 1).into_instance("terminator", ());
+    let mut rt = Runtime::new();
+
+    let term = Terminator::new(NUM_MESSAGES - 1, rt.tx_control()).into_instance("terminator", ());
     let mut alice = Alice { num_sent: 0 }.into_instance("alice", ());
     let mut bob = Bob { num_recv: 0 }.into_instance("bob", ());
 
     alice.tx.ping.connect(&mut bob.rx.ping).unwrap();
 
-    test_schedule(
+    rt.add_codelet_schedule(
         ScheduleBuilder::new()
             .with_period(Duration::from_millis(2))
             .with(term)
             .with(alice)
             .with(bob)
-            .finalize(),
+            .into(),
     );
+
+    rt.spin();
 }
 
 #[test]

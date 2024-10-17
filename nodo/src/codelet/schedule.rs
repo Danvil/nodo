@@ -237,9 +237,6 @@ impl ScheduleExecutor {
             let result = self.sm.transition(transition);
 
             match result {
-                Ok(OutcomeKind::Terminated) => {
-                    self.next_transition = Some(Transition::Stop);
-                }
                 Ok(OutcomeKind::Running) | Ok(OutcomeKind::Skipped) => {
                     self.next_transition = match transition {
                         Transition::Start | Transition::Step | Transition::Resume => {
@@ -304,24 +301,17 @@ impl SequenceGroupExec {
 
 impl Lifecycle for SequenceGroupExec {
     fn cycle(&mut self, transition: Transition) -> Outcome {
-        let mut is_any_skipped = false;
         let mut is_any_running = false;
-        let mut is_terminated = false;
         for item in self.items.iter_mut() {
             match item.cycle(transition)? {
-                OutcomeKind::Skipped => is_any_skipped = true,
+                OutcomeKind::Skipped => {}
                 OutcomeKind::Running => is_any_running = true,
-                OutcomeKind::Terminated => is_terminated = true,
             }
         }
-        if is_terminated {
-            TERMINATED
-        } else if is_any_running {
+        if is_any_running {
             RUNNING
-        } else if is_any_skipped {
-            SKIPPED
         } else {
-            TERMINATED
+            SKIPPED
         }
     }
 }
@@ -375,15 +365,10 @@ impl Lifecycle for SequenceExec {
     fn cycle(&mut self, transition: Transition) -> Outcome {
         let mut result = SequenceExecCycleResult::new();
 
-        let mut is_terminated = false;
-
         for csm in self.items.iter_mut() {
             match csm.transition(transition) {
                 Err(err) => {
                     result.mark(csm.inner(), err.into());
-                }
-                Ok(OutcomeKind::Terminated) => {
-                    is_terminated = true;
                 }
                 Ok(_) => {}
             }
@@ -391,13 +376,7 @@ impl Lifecycle for SequenceExec {
 
         match result.into() {
             Some(err) => Err(err),
-            None => {
-                if is_terminated {
-                    TERMINATED
-                } else {
-                    RUNNING
-                }
-            }
+            None => RUNNING,
         }
     }
 }
