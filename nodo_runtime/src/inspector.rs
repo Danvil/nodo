@@ -102,7 +102,6 @@ impl InspectorClient {
         loop {
             match self.socket.try_recv() {
                 Ok(buff) => {
-                    println!("{}", buff.len());
                     maybe_buff = Some(buff);
                 }
                 Err(nng::Error::TryAgain) => break,
