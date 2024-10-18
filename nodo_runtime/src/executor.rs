@@ -1,8 +1,8 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
+use crate::InspectorReport;
 use crate::{accurate_sleep_until, ScheduleExecutor};
-use nodo::codelet::{Clocks, Statistics, TaskClocks};
-use std::collections::HashMap;
+use nodo::codelet::{Clocks, TaskClocks};
 
 pub struct Executor {
     clocks: Clocks,
@@ -11,11 +11,11 @@ pub struct Executor {
 
 pub enum WorkerRequest {
     Stop,
-    Statistics,
+    Report,
 }
 
 pub enum WorkerReply {
-    Statistics(HashMap<(String, String), Statistics>),
+    Report(InspectorReport),
 }
 
 pub struct WorkerState {
@@ -68,10 +68,10 @@ impl Executor {
         }
     }
 
-    pub fn statistics(&self) -> HashMap<(String, String), Statistics> {
-        let mut result = HashMap::new();
+    pub fn report(&self) -> InspectorReport {
+        let mut result = InspectorReport::default();
         for w in self.workers.iter() {
-            result.extend(w.statistics());
+            result.extend(w.report());
         }
         result
     }
@@ -136,9 +136,9 @@ impl Worker {
             // handle requests
             match state.rx_request.try_recv() {
                 Ok(WorkerRequest::Stop) => break,
-                Ok(WorkerRequest::Statistics) => state
+                Ok(WorkerRequest::Report) => state
                     .tx_reply
-                    .send(WorkerReply::Statistics(state.schedule.statistics()))
+                    .send(WorkerReply::Report(state.schedule.report()))
                     .unwrap(),
                 Err(_) => {
                     // FIXME
@@ -156,14 +156,14 @@ impl Worker {
 
         state
             .tx_reply
-            .send(WorkerReply::Statistics(state.schedule.statistics()))
+            .send(WorkerReply::Report(state.schedule.report()))
             .ok();
     }
 
-    fn statistics(&self) -> HashMap<(String, String), Statistics> {
-        self.tx_request.send(WorkerRequest::Statistics).ok();
+    fn report(&self) -> InspectorReport {
+        self.tx_request.send(WorkerRequest::Report).ok();
         match self.rx_reply.recv() {
-            Ok(WorkerReply::Statistics(stats)) => stats,
+            Ok(WorkerReply::Report(stats)) => stats,
             _ => panic!(),
         }
     }

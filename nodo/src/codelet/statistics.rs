@@ -2,22 +2,25 @@
 
 use crate::codelet::TransitionMap;
 use core::time::Duration;
+use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Statistics {
     pub transitions: TransitionMap<TransitionStatistics>,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct TransitionStatistics {
     pub duration: CountTotal,
     pub period: CountTotal,
     pub skipped_count: u64,
+
+    #[serde(skip)]
     last_exec_begin: Option<Instant>,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct CountTotal {
     count: u64,
     total: Duration,

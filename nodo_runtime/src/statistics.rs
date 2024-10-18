@@ -1,12 +1,13 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use nodo::codelet::{Statistics, Transition};
-use std::collections::HashMap;
+use crate::InspectorCodeletReport;
+use crate::InspectorReport;
+use nodo::codelet::Transition;
 
-pub fn statistics_pretty_print(stats: HashMap<(String, String), Statistics>) {
-    let mut vec = stats.iter().collect::<Vec<_>>();
-    vec.sort_by_key(|(_, stats)| {
-        stats.transitions[Transition::Step]
+pub fn statistics_pretty_print(report: InspectorReport) {
+    let mut vec = report.into_vec();
+    vec.sort_by_key(|u| {
+        u.statistics.transitions[Transition::Step]
             .duration
             .total()
             .as_nanos()
@@ -17,11 +18,17 @@ pub fn statistics_pretty_print(stats: HashMap<(String, String), Statistics>) {
     println!("| NAME                     | TYPE                             | STEP              Duration                       Period               | START            |");
     println!("|                          |                                  | Skipped| Count  | (min-avg-max) [ms]   | Total | (min-avg-max) [ms]   | Count  |  D [ms] |");
     println!("+--------------------------+----------------------------------+--------+--------+----------------------+-------+----------------------+--------+---------+");
-    for ((tag, typename), stats) in vec.into_iter().rev() {
+    for InspectorCodeletReport {
+        name: tag,
+        typename,
+        statistics: stats,
+        ..
+    } in vec.into_iter().rev()
+    {
         println!(
             "| {:024} | {:032} | {:6} | {:6} | {} {} {} |{} | {} {} {} | {:2} /{:2} | {} |",
-            cut_middle(tag, 24),
-            cut_middle(typename, 32),
+            cut_middle(&tag, 24),
+            cut_middle(&typename, 32),
             stats.transitions[Transition::Step].skipped_count,
             stats.transitions[Transition::Step].duration.count(),
             stats.transitions[Transition::Step]

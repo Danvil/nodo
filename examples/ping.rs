@@ -9,6 +9,8 @@ struct Ping;
 fn main() -> eyre::Result<()> {
     let mut rt = Runtime::new();
 
+    rt.enable_inspector("tcp://localhost:54399")?;
+
     let mut source = Source::new(|| Ping).into_instance("source", ());
 
     let mut sink = Sink::new(|x| {

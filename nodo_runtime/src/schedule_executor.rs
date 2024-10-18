@@ -1,13 +1,14 @@
 // Copyright 2024 by David Weikersdorfer. All rights reserved.
 
+use crate::InspectorCodeletReport;
+use crate::InspectorReport;
+use crate::RenderedStatus;
 use crate::StateMachine;
 use core::time::Duration;
 use eyre::Result;
-use nodo::codelet::{
-    DynamicVise, Lifecycle, ScheduleBuilder, Statistics, TaskClocks, Transition, ViseTrait,
-};
+use nodo::codelet::{DynamicVise, Lifecycle, ScheduleBuilder, TaskClocks, Transition, ViseTrait};
 use nodo_core::{Report, *};
-use std::{collections::HashMap, time::Instant};
+use std::time::Instant;
 
 impl From<ScheduleBuilder> for ScheduleExecutor {
     fn from(builder: ScheduleBuilder) -> Self {
@@ -115,8 +116,8 @@ impl ScheduleExecutor {
         }
     }
 
-    pub fn statistics(&self) -> HashMap<(String, String), Statistics> {
-        self.sm.inner().statistics()
+    pub fn report(&self) -> InspectorReport {
+        self.sm.inner().report()
     }
 }
 
@@ -140,10 +141,10 @@ impl SequenceGroupExec {
         }
     }
 
-    pub fn statistics(&self) -> HashMap<(String, String), Statistics> {
-        let mut result = HashMap::new();
+    pub fn report(&self) -> InspectorReport {
+        let mut result = InspectorReport::default();
         for item in self.items.iter() {
-            result.extend(item.statistics());
+            result.extend(item.report());
         }
         result
     }
@@ -195,19 +196,20 @@ impl SequenceExec {
         }
     }
 
-    pub fn statistics(&self) -> HashMap<(String, String), Statistics> {
-        self.items
-            .iter()
-            .map(|vice| {
-                (
-                    (
-                        vice.inner().name().to_string(),
-                        vice.inner().type_name().to_string(),
-                    ),
-                    vice.inner().statistics().clone(),
-                )
-            })
-            .collect()
+    pub fn report(&self) -> InspectorReport {
+        let mut report = InspectorReport::default();
+        for vice in self.items.iter() {
+            report.push(InspectorCodeletReport {
+                name: vice.inner().name().to_string(),
+                typename: vice.inner().type_name().to_string(),
+                status: vice
+                    .inner()
+                    .status()
+                    .map(|(label, status)| RenderedStatus { label, status }),
+                statistics: vice.inner().statistics().clone(),
+            });
+        }
+        report
     }
 }
 

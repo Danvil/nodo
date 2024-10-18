@@ -4,10 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bincode = { workspace = true }
 ctrlc = "3.4"
 eyre = "0.6"
 log = "0.4"
+nng = { workspace = true }
 nodo = { path = "../nodo"}
 nodo_core = { path = "../nodo_core"}
 nodo_std = { path = "../nodo_std"}
+serde = { workspace = true }
 thiserror = "1"
+

@@ -10,6 +10,7 @@ nodo_core = { path = "../nodo_core"}
 nodo_derive = { path = "../nodo_derive"}
 paste = "1.0"
 profiling = "1.0"
+serde = { workspace = true }
 thiserror = "1"
 
 [dev-dependencies]

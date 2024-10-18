@@ -4,6 +4,7 @@ use core::{
     fmt,
     ops::{Index, IndexMut},
 };
+use serde::{Deserialize, Serialize};
 
 /// Codelet state transitions
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -28,8 +29,14 @@ impl Transition {
 }
 
 /// Map of codelet transition function to custom data
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct TransitionMap<T>([T; 5]);
+
+impl<T> TransitionMap<T> {
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.0.iter()
+    }
+}
 
 impl<T> Index<Transition> for TransitionMap<T> {
     type Output = T;

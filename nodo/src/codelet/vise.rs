@@ -1,7 +1,10 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::codelet::{Codelet, CodeletInstance, Lifecycle, Statistics, TaskClocks, Transition};
+use crate::codelet::{
+    Codelet, CodeletInstance, CodeletStatus, Lifecycle, Statistics, TaskClocks, Transition,
+};
 use eyre::Result;
+use nodo_core::DefaultStatus;
 use nodo_core::OutcomeKind;
 
 /// Wrapper around a codelet with additional information
@@ -45,6 +48,9 @@ pub trait ViseTrait: Send + Lifecycle {
     /// The typename of the codelet used by this instance
     fn type_name(&self) -> &str;
 
+    /// Gets the status as a string and the corresponding simplified status
+    fn status(&self) -> Option<(String, DefaultStatus)>;
+
     /// Called once at the beginning to setup the clock
     fn setup_task_clocks(&mut self, clocks: TaskClocks);
 
@@ -59,6 +65,13 @@ impl<C: Codelet> ViseTrait for Vise<C> {
 
     fn type_name(&self) -> &str {
         self.instance.type_name()
+    }
+
+    fn status(&self) -> Option<(String, DefaultStatus)> {
+        self.instance
+            .status
+            .as_ref()
+            .map(|s| (s.label().to_string(), s.as_default_status()))
     }
 
     fn setup_task_clocks(&mut self, clocks: TaskClocks) {
@@ -85,6 +98,10 @@ impl ViseTrait for DynamicVise {
 
     fn type_name(&self) -> &str {
         self.0.type_name()
+    }
+
+    fn status(&self) -> Option<(String, DefaultStatus)> {
+        self.0.status()
     }
 
     fn setup_task_clocks(&mut self, clocks: TaskClocks) {

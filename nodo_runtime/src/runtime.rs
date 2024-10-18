@@ -1,27 +1,39 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
+use crate::InspectorReport;
+use crate::InspectorServer;
 use crate::{
     statistics_pretty_print, Executor as CodeletExecutor, ScheduleExecutor as CodeletSchedule,
 };
 use core::time::Duration;
+use eyre::Result;
 use nodo::prelude::RuntimeControl;
+use std::collections::HashMap;
 use std::sync::mpsc::RecvTimeoutError;
 
 pub struct Runtime {
     tx_control: std::sync::mpsc::SyncSender<RuntimeControl>,
     rx_control: std::sync::mpsc::Receiver<RuntimeControl>,
     codelet_exec: CodeletExecutor,
+    inspector_server: Option<InspectorServer>,
 }
 
 impl Runtime {
     pub fn new() -> Self {
         let (tx_control, rx_control) = std::sync::mpsc::sync_channel(16);
         let codelet_exec = CodeletExecutor::new();
+
         Self {
             tx_control,
             rx_control,
             codelet_exec,
+            inspector_server: None,
         }
+    }
+
+    pub fn enable_inspector(&mut self, address: &str) -> Result<()> {
+        self.inspector_server = Some(InspectorServer::open(address)?);
+        Ok(())
     }
 
     pub fn add_codelet_schedule(&mut self, schedule: CodeletSchedule) {
@@ -45,7 +57,7 @@ impl Runtime {
     }
 
     pub fn spin(&mut self) {
-        let sleep_duration = Duration::from_millis(500);
+        let sleep_duration = Duration::from_millis(100);
 
         loop {
             match self.rx_control.recv_timeout(sleep_duration) {
@@ -66,9 +78,17 @@ impl Runtime {
                     break;
                 }
             }
+
+            // inspector
+            if let Some(inspector) = self.inspector_server.as_ref() {
+                match inspector.send_report(self.codelet_exec.report()) {
+                    Err(err) => log::error!("inspector could not send report: {err:?}"),
+                    Ok(()) => {}
+                }
+            }
         }
 
-        statistics_pretty_print(self.codelet_exec.statistics());
+        statistics_pretty_print(self.codelet_exec.report());
     }
 
     #[deprecated(since = "0.2.0", note = "use `enable_terminate_on_ctrl_c` instead")]
