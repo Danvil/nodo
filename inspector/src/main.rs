@@ -159,23 +159,26 @@ impl ReportViewController {
 
             let is_expanded = *self.expanded_seq.entry(seq.clone()).or_insert(true);
 
+            const BASE_LEN: usize = 70;
+
             if Some(&seq) != prev_sequence.as_ref() {
                 prev_sequence = Some(seq.clone());
 
                 let head = Row::new(vec![
-                    Cell::from(Span::styled(
-                        format!("{}{}", if is_expanded { "+ " } else { "- " }, seq),
-                        Color::White,
+                    Cell::from(Line::from(vec![
+                        Span::from(if is_expanded { "+ " } else { "- " }),
+                        Span::styled(seq.clone(), Color::White),
+                        Span::from(format!(" {}", "─".repeat(2 * BASE_LEN))),
+                    ])),
+                    Cell::from("─".repeat(BASE_LEN)),
+                    Cell::from("─".repeat(10)),
+                    Cell::from(align_right(
+                        format_total_duration(seq_duration, overall_step_duration_total, 0.35)
+                            .patch_style(Style::default().add_modifier(Modifier::REVERSED)),
                     )),
-                    Cell::from("--------"),
-                    Cell::from("----------"),
-                    Cell::from(align_right(format_total_duration(
-                        seq_duration,
-                        overall_step_duration_total,
-                    ))),
-                    Cell::from("----------"),
-                    Cell::from("----------"),
-                    Cell::from("----------"),
+                    Cell::from("─".repeat(10)),
+                    Cell::from("─".repeat(10)),
+                    Cell::from("─".repeat(4 * BASE_LEN)),
                 ]);
 
                 combined_rows.push(head);
@@ -186,12 +189,16 @@ impl ReportViewController {
                 let transition = &u.statistics.transitions[Transition::Step];
 
                 let row = Row::new(vec![
-                    Cell::from(Span::styled(format!("├── {}", u.name), Color::White)),
+                    Cell::from(Line::from(vec![
+                        Span::from("├──"),
+                        Span::styled(format!(" {}", u.name), Color::White),
+                    ])),
                     Cell::from(format_status(&u.status)),
                     Cell::from(align_right(format_skip_percent(transition))),
                     Cell::from(align_right(format_total_duration(
                         transition.duration.total().as_secs_f32(),
                         overall_step_duration_total,
+                        0.10,
                     ))),
                     Cell::from(align_right(format_step_count(transition))),
                     Cell::from(align_right(format_period(transition))),
@@ -231,9 +238,8 @@ impl ReportViewController {
             ])
             .style(
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::White)
-                    .add_modifier(Modifier::BOLD),
+                    .add_modifier(Modifier::BOLD)
+                    .add_modifier(Modifier::REVERSED),
             ),
         )
         .block(
@@ -306,11 +312,11 @@ fn format_skip_percent(u: &TransitionStatistics) -> Span<'static> {
     }
 }
 
-fn format_total_duration(x: f32, overall_total: f32) -> Span<'static> {
+fn format_total_duration(x: f32, overall_total: f32, threshold: f32) -> Span<'static> {
     let p = x / overall_total;
-    let color = if p > 0.10 {
+    let color = if p > threshold {
         Color::LightRed
-    } else if p > 0.01 {
+    } else if p > 0.1 * threshold {
         Color::Yellow
     } else {
         Color::White
