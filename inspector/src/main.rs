@@ -267,6 +267,7 @@ impl ReportViewController {
                         format!("[{:.0} kB/s] ", datarate / (1024.0)),
                         Style::default().fg(Color::White),
                     ),
+                    Span::from(" ── Press q to quit "),
                 ])),
         )
         .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
