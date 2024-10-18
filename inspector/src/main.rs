@@ -170,7 +170,7 @@ impl ReportViewController {
                         Span::styled(seq.clone(), Color::White),
                         Span::from(format!(" {}", "─".repeat(2 * BASE_LEN))),
                     ])),
-                    Cell::from("─".repeat(BASE_LEN)),
+                    Cell::from("─".repeat(2 * BASE_LEN)),
                     Cell::from("─".repeat(10)),
                     Cell::from(align_right(
                         format_total_duration(seq_duration, overall_step_duration_total, 0.35)
@@ -224,7 +224,7 @@ impl ReportViewController {
             combined_rows,
             &[
                 Constraint::Fill(2),    // Inspector name
-                Constraint::Fill(1),    // Status label
+                Constraint::Fill(2),    // Status label
                 Constraint::Length(8),  // Skipped flag
                 Constraint::Length(10), // Total duration
                 Constraint::Length(10), // Count
@@ -234,7 +234,13 @@ impl ReportViewController {
         )
         .header(
             Row::new(vec![
-                "Codelet", "Status", "Skip%", "Time", "Count", "Period", "Type",
+                "Codelet".into(),
+                "Status".into(),
+                align_right("Skip%".into()),
+                align_right("Time".into()),
+                align_right("Count".into()),
+                align_right("Period".into()),
+                "Type".into(),
             ])
             .style(
                 Style::default()
