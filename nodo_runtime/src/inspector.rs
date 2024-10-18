@@ -40,6 +40,7 @@ impl InspectorReport {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct InspectorCodeletReport {
+    pub sequence: String,
     pub name: String,
     pub typename: String,
     pub status: Option<RenderedStatus>,
@@ -100,7 +101,10 @@ impl InspectorClient {
         let mut maybe_buff = None;
         loop {
             match self.socket.try_recv() {
-                Ok(buff) => maybe_buff = Some(buff),
+                Ok(buff) => {
+                    println!("{}", buff.len());
+                    maybe_buff = Some(buff);
+                }
                 Err(nng::Error::TryAgain) => break,
                 Err(err) => return Err(err)?,
             }
