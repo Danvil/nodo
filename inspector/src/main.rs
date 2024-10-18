@@ -35,7 +35,7 @@ fn main() -> Result<()> {
 
     let mut terminal = (!cli.disable_tui).then(|| ratatui::init());
 
-    let inspector = InspectorClient::dial(&cli.address)?;
+    let mut inspector = InspectorClient::dial(&cli.address)?;
 
     let mut rvc = ReportViewController::new();
 
@@ -47,7 +47,7 @@ fn main() -> Result<()> {
         }
 
         if let Some(terminal) = terminal.as_mut() {
-            terminal.draw(|f| rvc.draw_ui(f, latest_report.as_ref()))?;
+            terminal.draw(|f| rvc.draw_ui(f, inspector.datarate(), latest_report.as_ref()))?;
 
             // Exit on "q" key press.
             if event::poll(Duration::from_millis(500))? {
@@ -103,7 +103,7 @@ impl ReportViewController {
     }
 
     // Updated draw_ui to handle the new InspectorReport structure and create a single table.
-    pub fn draw_ui(&mut self, frame: &mut Frame, report: Option<&InspectorReport>) {
+    pub fn draw_ui(&mut self, frame: &mut Frame, datarate: f64, report: Option<&InspectorReport>) {
         let chunks = Layout::default()
             .constraints([Constraint::Percentage(100)].as_ref())
             .split(frame.area());
@@ -253,12 +253,21 @@ impl ReportViewController {
             ),
         )
         .block(
-            Block::default().borders(Borders::ALL).title(Span::styled(
-                " NODO INSPECTOR ",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            )),
+            Block::default()
+                .borders(Borders::ALL)
+                .title(Line::from(vec![
+                    Span::styled(
+                        " NODO INSPECTOR",
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::from(" ─── "),
+                    Span::styled(
+                        format!("[{:.0} kB/s] ", datarate / (1024.0)),
+                        Style::default().fg(Color::White),
+                    ),
+                ])),
         )
         .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
         .style(Color::Yellow);

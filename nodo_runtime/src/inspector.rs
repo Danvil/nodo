@@ -6,6 +6,7 @@ use nng::{
 use nodo::{codelet::Statistics, prelude::DefaultStatus};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::Instant;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RenderedStatus {
@@ -77,6 +78,7 @@ impl InspectorServer {
 /// The client is running in the report viewer and receives reports
 pub struct InspectorClient {
     socket: Socket,
+    datarate: DatarateEstimation,
 }
 
 impl InspectorClient {
@@ -94,14 +96,18 @@ impl InspectorClient {
         // subscribe to all topics
         socket.set_opt::<Subscribe>(vec![])?;
 
-        Ok(Self { socket })
+        Ok(Self {
+            socket,
+            datarate: DatarateEstimation::default(),
+        })
     }
 
-    pub fn try_recv_report(&self) -> Result<Option<InspectorReport>> {
+    pub fn try_recv_report(&mut self) -> Result<Option<InspectorReport>> {
         let mut maybe_buff = None;
         loop {
             match self.socket.try_recv() {
                 Ok(buff) => {
+                    self.datarate.push(buff.len() as u64);
                     maybe_buff = Some(buff);
                 }
                 Err(nng::Error::TryAgain) => break,
@@ -112,5 +118,42 @@ impl InspectorClient {
             .as_ref()
             .map(|buff| bincode::deserialize(buff))
             .transpose()?)
+    }
+
+    pub fn datarate(&self) -> f64 {
+        self.datarate.datarate()
+    }
+}
+
+#[derive(Default)]
+pub struct DatarateEstimation {
+    total_bytes_received: u64,
+    datarate: f64,
+    last_step: Option<Instant>,
+    bytes_since_last_step: u64,
+}
+
+impl DatarateEstimation {
+    pub fn push(&mut self, len: u64) {
+        self.bytes_since_last_step += len;
+        self.total_bytes_received += len;
+
+        let now = Instant::now();
+        if let Some(prev) = self.last_step {
+            let dt = (now - prev).as_secs_f64();
+            if dt > 3.0 {
+                self.last_step = Some(now);
+                self.datarate =
+                    0.2 * self.datarate + 0.8 * (self.bytes_since_last_step as f64) / dt;
+                self.bytes_since_last_step = 0;
+            }
+        } else {
+            self.last_step = Some(now);
+        }
+    }
+
+    /// Datarate in bytes/s
+    pub fn datarate(&self) -> f64 {
+        self.datarate
     }
 }
