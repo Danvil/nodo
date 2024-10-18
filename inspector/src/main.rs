@@ -178,6 +178,7 @@ impl ReportViewController {
                     )),
                     Cell::from("─".repeat(10)),
                     Cell::from("─".repeat(10)),
+                    Cell::from("─".repeat(10)),
                     Cell::from("─".repeat(4 * BASE_LEN)),
                 ]);
 
@@ -200,6 +201,7 @@ impl ReportViewController {
                         overall_step_duration_total,
                         0.10,
                     ))),
+                    Cell::from(align_right(format_step_duration(transition))),
                     Cell::from(align_right(format_step_count(transition))),
                     Cell::from(align_right(format_period(transition))),
                     Cell::from(Text::from(format_typename(&u.typename))),
@@ -227,6 +229,7 @@ impl ReportViewController {
                 Constraint::Fill(2),    // Status label
                 Constraint::Length(8),  // Skipped flag
                 Constraint::Length(10), // Total duration
+                Constraint::Length(10), // Step
                 Constraint::Length(10), // Count
                 Constraint::Length(10), // Period
                 Constraint::Fill(4),    // Type name
@@ -238,6 +241,7 @@ impl ReportViewController {
                 "Status".into(),
                 align_right("Skip%".into()),
                 align_right("Time".into()),
+                align_right("Step".into()),
                 align_right("Count".into()),
                 align_right("Period".into()),
                 "Type".into(),
@@ -328,6 +332,22 @@ fn format_total_duration(x: f32, overall_total: f32, threshold: f32) -> Span<'st
         Color::White
     };
     Span::styled(format!("{:>7.1}s", x), color)
+}
+
+fn format_step_duration(u: &TransitionStatistics) -> Span<'static> {
+    if let (Some(x), Some(period)) = (u.duration.average_ms(), u.period.average_ms()) {
+        let p = x / period;
+        let color = if p > 0.5 {
+            Color::LightRed
+        } else if p > 0.20 {
+            Color::Yellow
+        } else {
+            Color::White
+        };
+        Span::styled(format!("{:>5.1} ms", x), color)
+    } else {
+        Span::styled(format!("{:>8}", "None"), Color::DarkGray)
+    }
 }
 
 fn format_step_count(u: &TransitionStatistics) -> Span<'static> {
