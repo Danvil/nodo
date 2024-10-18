@@ -23,6 +23,9 @@ use std::collections::HashMap;
 struct Cli {
     #[arg(long, default_value = "tcp://localhost:54399")]
     address: String,
+
+    #[arg(long)]
+    disable_tui: bool,
 }
 
 fn main() -> Result<()> {
@@ -30,8 +33,7 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    // Setup terminal.
-    let mut terminal = ratatui::init();
+    let mut terminal = (!cli.disable_tui).then(|| ratatui::init());
 
     let inspector = InspectorClient::dial(&cli.address)?;
 
@@ -44,24 +46,25 @@ fn main() -> Result<()> {
             latest_report = Some(next);
         }
 
-        terminal.draw(|f| rvc.draw_ui(f, latest_report.as_ref()))?;
+        if let Some(terminal) = terminal.as_mut() {
+            terminal.draw(|f| rvc.draw_ui(f, latest_report.as_ref()))?;
 
-        // Exit on "q" key press.
-        if event::poll(Duration::from_millis(500))? {
-            match event::read()? {
-                event::Event::Key(key) => match key.code {
-                    KeyCode::Char('q') => break,
-                    KeyCode::Down => rvc.select_next(),
-                    KeyCode::Up => rvc.select_previous(),
-                    KeyCode::Enter => rvc.toggle_expand(),
+            // Exit on "q" key press.
+            if event::poll(Duration::from_millis(500))? {
+                match event::read()? {
+                    event::Event::Key(key) => match key.code {
+                        KeyCode::Char('q') => break,
+                        KeyCode::Down => rvc.select_next(),
+                        KeyCode::Up => rvc.select_previous(),
+                        KeyCode::Enter => rvc.toggle_expand(),
+                        _ => {}
+                    },
                     _ => {}
-                },
-                _ => {}
+                }
             }
         }
     }
 
-    // Restore terminal.
     ratatui::restore();
 
     Ok(())
