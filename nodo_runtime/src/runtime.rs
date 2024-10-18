@@ -1,15 +1,13 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::InspectorReport;
-use crate::InspectorServer;
 use crate::{
-    statistics_pretty_print, Executor as CodeletExecutor, ScheduleExecutor as CodeletSchedule,
+    statistics_pretty_print, Executor as CodeletExecutor, InspectorReport, InspectorServer,
+    ScheduleExecutor as CodeletSchedule,
 };
 use core::time::Duration;
 use eyre::Result;
 use nodo::prelude::RuntimeControl;
-use std::collections::HashMap;
-use std::sync::mpsc::RecvTimeoutError;
+use std::{collections::HashMap, sync::mpsc::RecvTimeoutError};
 
 pub struct Runtime {
     tx_control: std::sync::mpsc::SyncSender<RuntimeControl>,

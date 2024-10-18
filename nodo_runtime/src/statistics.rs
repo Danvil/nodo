@@ -1,7 +1,6 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::InspectorCodeletReport;
-use crate::InspectorReport;
+use crate::{InspectorCodeletReport, InspectorReport};
 use nodo::codelet::Transition;
 
 pub fn statistics_pretty_print(report: InspectorReport) {

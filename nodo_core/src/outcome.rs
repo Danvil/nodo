@@ -1,7 +1,6 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub use eyre::{ensure, eyre, Result, WrapErr};
 

@@ -45,6 +45,16 @@ impl TransitionStatistics {
         }
     }
 
+    /// Percentage of steps which were skipped
+    pub fn skip_percent(&self) -> f32 {
+        let total = self.skipped_count + self.duration.count;
+        if total == 0 {
+            0.
+        } else {
+            self.skipped_count as f32 / total as f32
+        }
+    }
+
     pub fn begin(&mut self) {
         let now = Instant::now();
 

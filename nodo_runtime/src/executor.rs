@@ -1,7 +1,6 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
-use crate::InspectorReport;
-use crate::{accurate_sleep_until, ScheduleExecutor};
+use crate::{accurate_sleep_until, InspectorReport, ScheduleExecutor};
 use nodo::codelet::{Clocks, TaskClocks};
 
 pub struct Executor {

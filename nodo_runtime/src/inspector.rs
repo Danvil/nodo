@@ -1,9 +1,9 @@
 use eyre::Result;
-use nng::options::protocol::pubsub::Subscribe;
-use nng::options::Options;
-use nng::{Protocol, Socket};
-use nodo::codelet::Statistics;
-use nodo::prelude::DefaultStatus;
+use nng::{
+    options::{protocol::pubsub::Subscribe, Options},
+    Protocol, Socket,
+};
+use nodo::{codelet::Statistics, prelude::DefaultStatus};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

@@ -1,9 +1,6 @@
 // Copyright 2024 by David Weikersdorfer. All rights reserved.
 
-use crate::InspectorCodeletReport;
-use crate::InspectorReport;
-use crate::RenderedStatus;
-use crate::StateMachine;
+use crate::{InspectorCodeletReport, InspectorReport, RenderedStatus, StateMachine};
 use core::time::Duration;
 use eyre::Result;
 use nodo::codelet::{DynamicVise, Lifecycle, ScheduleBuilder, TaskClocks, Transition, ViseTrait};

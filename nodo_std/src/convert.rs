@@ -93,7 +93,7 @@ mod tests {
     //             .with(source)
     //             .with(into)
     //             .with(sink)
-    //             .finalize(),
+    //             .into(),
     //     );
 
     //     rt.spin();

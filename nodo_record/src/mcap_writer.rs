@@ -62,6 +62,7 @@ impl McapWriter<'_> {
 }
 
 impl Codelet for McapWriter<'_> {
+    type Status = DefaultStatus;
     type Config = McapWriterConfig;
     type Rx = (DoubleBufferRx<SerializedMessage>,);
     type Tx = ();

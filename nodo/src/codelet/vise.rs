@@ -4,8 +4,7 @@ use crate::codelet::{
     Codelet, CodeletInstance, CodeletStatus, Lifecycle, Statistics, TaskClocks, Transition,
 };
 use eyre::Result;
-use nodo_core::DefaultStatus;
-use nodo_core::OutcomeKind;
+use nodo_core::{DefaultStatus, OutcomeKind};
 
 /// Wrapper around a codelet with additional information
 pub struct Vise<C: Codelet> {
