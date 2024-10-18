@@ -200,7 +200,7 @@ pub fn derive_status(input: TokenStream) -> TokenStream {
     let default_implementation_status = default_variant.unwrap_or_else(|| {
         quote! {
             fn default_implementation_status() -> Self {
-                panic!("No default status was specified for the enum");
+                compile_error!("No default status was specified. Use #[default] to choose one.");
             }
         }
     });
