@@ -79,6 +79,7 @@ impl InspectorServer {
 pub struct InspectorClient {
     socket: Socket,
     datarate: DatarateEstimation,
+    last_report_time: Option<Instant>,
 }
 
 impl InspectorClient {
@@ -99,6 +100,7 @@ impl InspectorClient {
         Ok(Self {
             socket,
             datarate: DatarateEstimation::default(),
+            last_report_time: None,
         })
     }
 
@@ -114,14 +116,21 @@ impl InspectorClient {
                 Err(err) => return Err(err)?,
             }
         }
-        Ok(maybe_buff
-            .as_ref()
-            .map(|buff| bincode::deserialize(buff))
-            .transpose()?)
+
+        if let Some(buff) = maybe_buff {
+            self.last_report_time = Some(Instant::now());
+            Ok(Some(bincode::deserialize(&buff)?))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn datarate(&self) -> f64 {
         self.datarate.datarate()
+    }
+
+    pub fn last_report_time(&self) -> Option<Instant> {
+        self.last_report_time
     }
 }
 

@@ -17,6 +17,7 @@ use ratatui::{
 };
 use regex::Regex;
 use std::collections::HashMap;
+use std::time::Instant;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -47,10 +48,17 @@ fn main() -> Result<()> {
         }
 
         if let Some(terminal) = terminal.as_mut() {
-            terminal.draw(|f| rvc.draw_ui(f, inspector.datarate(), latest_report.as_ref()))?;
+            terminal.draw(|f| {
+                rvc.draw_ui(
+                    f,
+                    inspector.datarate(),
+                    inspector.last_report_time(),
+                    latest_report.as_ref(),
+                )
+            })?;
 
             // Exit on "q" key press.
-            if event::poll(Duration::from_millis(500))? {
+            if event::poll(Duration::from_millis(250))? {
                 match event::read()? {
                     event::Event::Key(key) => match key.code {
                         KeyCode::Char('q') => break,
@@ -103,7 +111,13 @@ impl ReportViewController {
     }
 
     // Updated draw_ui to handle the new InspectorReport structure and create a single table.
-    pub fn draw_ui(&mut self, frame: &mut Frame, datarate: f64, report: Option<&InspectorReport>) {
+    pub fn draw_ui(
+        &mut self,
+        frame: &mut Frame,
+        datarate: f64,
+        last_report_time: Option<Instant>,
+        report: Option<&InspectorReport>,
+    ) {
         let chunks = Layout::default()
             .constraints([Constraint::Percentage(100)].as_ref())
             .split(frame.area());
@@ -221,6 +235,13 @@ impl ReportViewController {
             }
         }
 
+        let connection_status =
+            if last_report_time.map_or(false, |last| (Instant::now() - last).as_secs_f32() < 1.0) {
+                Span::styled("●", Color::Green)
+            } else {
+                Span::styled("■", Color::Red)
+            };
+
         // Create the combined table.
         let combined_table = Table::new(
             combined_rows,
@@ -262,9 +283,10 @@ impl ReportViewController {
                             .fg(Color::White)
                             .add_modifier(Modifier::BOLD),
                     ),
-                    Span::from(" ─── "),
+                    Span::from(" ── "),
+                    connection_status,
                     Span::styled(
-                        format!("[{:.0} kB/s] ", datarate / (1024.0)),
+                        format!(" [{:.0} kB/s] ", datarate / (1024.0)),
                         Style::default().fg(Color::White),
                     ),
                     Span::from(" ── Press q to quit "),
