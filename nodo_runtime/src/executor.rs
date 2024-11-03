@@ -1,9 +1,10 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::{accurate_sleep_until, InspectorReport, ScheduleExecutor};
-use nodo::codelet::{Clocks, TaskClocks};
+use nodo::codelet::{Clocks, NodeletId, NodeletSetup, WorkerId};
 
 pub struct Executor {
+    next_worker_id: WorkerId,
     clocks: Clocks,
     workers: Vec<Worker>,
 }
@@ -26,13 +27,21 @@ pub struct WorkerState {
 impl Executor {
     pub fn new() -> Self {
         Self {
+            next_worker_id: WorkerId(0),
             clocks: Clocks::new(),
             workers: Vec::new(),
         }
     }
 
     pub fn push(&mut self, mut schedule: ScheduleExecutor) {
-        schedule.setup_task_clocks(TaskClocks::from(self.clocks.clone()));
+        let worker_id = self.next_worker_id;
+        self.next_worker_id.0 += 1;
+
+        schedule.setup(NodeletSetup {
+            clocks: self.clocks.clone(),
+            nodelet_id_issue: NodeletId(worker_id, 0),
+        });
+
         self.workers.push(Worker::new(schedule));
     }
 

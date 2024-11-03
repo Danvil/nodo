@@ -6,9 +6,28 @@ use crate::{
 };
 use eyre::Result;
 use nodo_core::*;
+use serde::{Deserialize, Serialize};
+
+/// Unique identifier of a worker (i.e. thread)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct WorkerId(pub u32);
+
+impl WorkerId {
+    pub const INVALID: Self = WorkerId(u32::MAX);
+}
+
+/// Unique identifier of a nodelet running in a worker
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct NodeletId(pub WorkerId, pub u32);
+
+impl NodeletId {
+    pub const INVALID: Self = NodeletId(WorkerId::INVALID, u32::MAX);
+}
 
 /// Named instance of a codelet with configuration and channel bundels
 pub struct CodeletInstance<C: Codelet> {
+    pub id: NodeletId,
+
     pub name: String,
     pub state: C,
     pub config: C::Config,
@@ -40,6 +59,7 @@ impl<C: Codelet> CodeletInstance<C> {
         let rx_count = rx.len();
         let tx_count = tx.len();
         Self {
+            id: NodeletId::INVALID,
             name: name.into(),
             state,
             config,

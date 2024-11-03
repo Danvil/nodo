@@ -3,7 +3,7 @@
 use crate::{InspectorCodeletReport, InspectorReport, RenderedStatus, StateMachine};
 use core::time::Duration;
 use eyre::Result;
-use nodo::codelet::{DynamicVise, Lifecycle, ScheduleBuilder, TaskClocks, Transition, ViseTrait};
+use nodo::codelet::{DynamicVise, Lifecycle, NodeletSetup, ScheduleBuilder, Transition, ViseTrait};
 use nodo_core::{Report, *};
 use std::time::Instant;
 
@@ -61,8 +61,8 @@ impl ScheduleExecutor {
         self.last_instant
     }
 
-    pub fn setup_task_clocks(&mut self, clocks: TaskClocks) {
-        self.sm.inner_mut().setup_task_clocks(clocks);
+    pub fn setup(&mut self, setup: NodeletSetup) {
+        self.sm.inner_mut().setup(setup);
     }
 
     pub fn spin(&mut self) {
@@ -132,9 +132,9 @@ impl SequenceGroupExec {
         }
     }
 
-    pub fn setup_task_clocks(&mut self, clocks: TaskClocks) {
+    pub fn setup(&mut self, mut setup: NodeletSetup) {
         for item in self.items.iter_mut() {
-            item.setup_task_clocks(clocks.clone());
+            item.setup(&mut setup);
         }
     }
 
@@ -187,9 +187,9 @@ impl SequenceExec {
         }
     }
 
-    pub fn setup_task_clocks(&mut self, clocks: TaskClocks) {
+    pub fn setup(&mut self, setup: &mut NodeletSetup) {
         for csm in self.items.iter_mut() {
-            csm.inner_mut().setup_task_clocks(clocks.clone());
+            csm.inner_mut().setup(setup);
         }
     }
 
