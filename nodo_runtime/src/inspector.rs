@@ -1,12 +1,15 @@
 use eyre::Result;
+use lz4_flex::{compress_prepend_size, decompress_size_prepended};
 use nng::{
     options::{protocol::pubsub::Subscribe, Options},
     Protocol, Socket,
 };
-use nodo::{codelet::Statistics, prelude::DefaultStatus};
+use nodo::{
+    codelet::{NodeletId, Statistics},
+    prelude::DefaultStatus,
+};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RenderedStatus {
@@ -15,27 +18,29 @@ pub struct RenderedStatus {
 }
 
 #[derive(Default, Clone, Serialize, Deserialize)]
-pub struct InspectorReport(HashMap<String, InspectorCodeletReport>);
+pub struct InspectorReport(HashMap<NodeletId, InspectorCodeletReport>);
 
 impl InspectorReport {
-    pub fn push(&mut self, entry: InspectorCodeletReport) {
-        if self.0.contains_key(&entry.name) {
+    pub fn push(&mut self, id: NodeletId, entry: InspectorCodeletReport) {
+        if self.0.contains_key(&id) {
             log::error!(
-                "Duplicated codelet name: {}. This will be a hard error in the future.",
-                entry.name
+                "Duplicated codelet id: {:?} (name='{}', other='{}'). This will be a hard error in the future.",
+                id,
+                entry.name,
+                self.0[&id].name
             );
         }
-        self.0.insert(entry.name.clone(), entry);
+        self.0.insert(id, entry);
     }
 
     pub fn extend(&mut self, other: InspectorReport) {
-        for (_, entry) in other.0 {
-            self.push(entry);
+        for (id, entry) in other.0 {
+            self.push(id, entry);
         }
     }
 
-    pub fn into_vec(self) -> Vec<InspectorCodeletReport> {
-        self.0.into_iter().map(|(_, v)| v).collect()
+    pub fn into_vec(self) -> Vec<(NodeletId, InspectorCodeletReport)> {
+        self.0.into_iter().collect()
     }
 }
 

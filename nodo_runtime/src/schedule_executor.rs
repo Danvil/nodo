@@ -196,16 +196,19 @@ impl SequenceExec {
     pub fn report(&self) -> InspectorReport {
         let mut report = InspectorReport::default();
         for vice in self.items.iter() {
-            report.push(InspectorCodeletReport {
-                sequence: self.name.clone(),
-                name: vice.inner().name().to_string(),
-                typename: vice.inner().type_name().to_string(),
-                status: vice
-                    .inner()
-                    .status()
-                    .map(|(label, status)| RenderedStatus { label, status }),
-                statistics: vice.inner().statistics().clone(),
-            });
+            report.push(
+                vice.inner().id(),
+                InspectorCodeletReport {
+                    sequence: self.name.clone(),
+                    name: vice.inner().name().to_string(),
+                    typename: vice.inner().type_name().to_string(),
+                    status: vice
+                        .inner()
+                        .status()
+                        .map(|(label, status)| RenderedStatus { label, status }),
+                    statistics: vice.inner().statistics().clone(),
+                },
+            );
         }
         report
     }

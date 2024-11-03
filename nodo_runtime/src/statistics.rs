@@ -5,7 +5,7 @@ use nodo::codelet::Transition;
 
 pub fn statistics_pretty_print(report: InspectorReport) {
     let mut vec = report.into_vec();
-    vec.sort_by_key(|u| {
+    vec.sort_by_key(|(_, u)| {
         u.statistics.transitions[Transition::Step]
             .duration
             .total()
@@ -17,12 +17,15 @@ pub fn statistics_pretty_print(report: InspectorReport) {
     println!("| NAME                     | TYPE                             | STEP              Duration                       Period               | START            |");
     println!("|                          |                                  | Skipped| Count  | (min-avg-max) [ms]   | Total | (min-avg-max) [ms]   | Count  |  D [ms] |");
     println!("+--------------------------+----------------------------------+--------+--------+----------------------+-------+----------------------+--------+---------+");
-    for InspectorCodeletReport {
-        name: tag,
-        typename,
-        statistics: stats,
-        ..
-    } in vec.into_iter().rev()
+    for (
+        _,
+        InspectorCodeletReport {
+            name: tag,
+            typename,
+            statistics: stats,
+            ..
+        },
+    ) in vec.into_iter().rev()
     {
         println!(
             "| {:024} | {:032} | {:6} | {:6} | {} {} {} |{} | {} {} {} | {:2} /{:2} | {} |",

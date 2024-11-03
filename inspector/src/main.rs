@@ -2,7 +2,7 @@ use clap::Parser;
 use core::time::Duration;
 use eyre::Result;
 use nodo::{
-    codelet::{Transition, TransitionStatistics},
+    codelet::{NodeletId, Transition, TransitionStatistics},
     prelude::DefaultStatus,
 };
 use nodo_runtime::{InspectorClient, InspectorCodeletReport, InspectorReport, RenderedStatus};
@@ -16,8 +16,7 @@ use ratatui::{
     Frame,
 };
 use regex::Regex;
-use std::collections::HashMap;
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -127,7 +126,7 @@ impl ReportViewController {
         // duration of all nodelets
         let overall_step_duration_total: f32 = entries
             .iter()
-            .map(|u| {
+            .map(|(_, u)| {
                 u.statistics.transitions[Transition::Step]
                     .duration
                     .total()
@@ -139,7 +138,7 @@ impl ReportViewController {
         let sequence_duration_sum = compute_sequence_duration_sum(&entries);
 
         // Sort first by sequence total duration, second by total duration and thirdby name
-        entries.sort_by(|a, b| {
+        entries.sort_by(|(_, a), (_, b)| {
             let seq_a = sequence_duration_sum[&a.sequence];
             let seq_b = sequence_duration_sum[&b.sequence];
 
@@ -163,7 +162,7 @@ impl ReportViewController {
         let mut combined_rows: Vec<_> = Vec::new();
         let mut prev_sequence = None;
         let mut sel_helper = Vec::new();
-        for u in entries.into_iter().rev() {
+        for (id, u) in entries.into_iter().rev() {
             let seq_duration = sequence_duration_sum[&u.sequence];
             let seq = if u.sequence == "" {
                 "(ungrouped)".into()
@@ -193,6 +192,7 @@ impl ReportViewController {
                     Cell::from("─".repeat(10)),
                     Cell::from("─".repeat(10)),
                     Cell::from("─".repeat(10)),
+                    Cell::from("─".repeat(5)),
                     Cell::from("─".repeat(4 * BASE_LEN)),
                 ]);
 
@@ -218,6 +218,7 @@ impl ReportViewController {
                     Cell::from(align_right(format_step_duration(transition))),
                     Cell::from(align_right(format_step_count(transition))),
                     Cell::from(align_right(format_period(transition))),
+                    Cell::from(align_right(format_worker_id(id))),
                     Cell::from(Text::from(format_typename(&u.typename))),
                 ]);
 
@@ -253,6 +254,7 @@ impl ReportViewController {
                 Constraint::Length(10), // Step
                 Constraint::Length(10), // Count
                 Constraint::Length(10), // Period
+                Constraint::Length(5),  // WorkerId
                 Constraint::Fill(4),    // Type name
             ],
         )
@@ -265,6 +267,7 @@ impl ReportViewController {
                 align_right("Step".into()),
                 align_right("Count".into()),
                 align_right("Period".into()),
+                align_right("WID".into()),
                 "Type".into(),
             ])
             .style(
@@ -300,10 +303,12 @@ impl ReportViewController {
     }
 }
 
-fn compute_sequence_duration_sum(reports: &[InspectorCodeletReport]) -> HashMap<String, f32> {
+fn compute_sequence_duration_sum(
+    reports: &[(NodeletId, InspectorCodeletReport)],
+) -> HashMap<String, f32> {
     let mut sequence_duration_map = HashMap::new();
 
-    for report in reports {
+    for (_, report) in reports {
         // Access the Transition::Step for each report's statistics
         let step_transition = &report.statistics.transitions[Transition::Step];
 
@@ -393,6 +398,10 @@ fn format_period(u: &TransitionStatistics) -> Span<'static> {
     } else {
         Span::styled(format!("{:>8}", "Never"), Color::DarkGray)
     }
+}
+
+fn format_worker_id(id: NodeletId) -> Span<'static> {
+    Span::styled(format!("{:>3}", id.0 .0), Color::LightBlue)
 }
 
 /// Function to format a string as a `Span` with color formatting.
