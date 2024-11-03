@@ -70,7 +70,8 @@ impl InspectorServer {
 
     pub fn send_report(&self, report: InspectorReport) -> Result<()> {
         let buffer = bincode::serialize(&report)?;
-        self.socket.send(&buffer).map_err(|(_, err)| err)?;
+        let compressed = compress_prepend_size(&buffer);
+        self.socket.send(&compressed).map_err(|(_, err)| err)?;
         Ok(())
     }
 }
@@ -119,7 +120,8 @@ impl InspectorClient {
 
         if let Some(buff) = maybe_buff {
             self.last_report_time = Some(Instant::now());
-            Ok(Some(bincode::deserialize(&buff)?))
+            let uncompressed = decompress_size_prepended(&buff)?;
+            Ok(Some(bincode::deserialize(&uncompressed)?))
         } else {
             Ok(None)
         }
