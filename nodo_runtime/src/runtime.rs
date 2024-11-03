@@ -1,13 +1,13 @@
 // Copyright 2023 by David Weikersdorfer. All rights reserved.
 
 use crate::{
-    statistics_pretty_print, Executor as CodeletExecutor, InspectorReport, InspectorServer,
+    statistics_pretty_print, Executor as CodeletExecutor, InspectorServer,
     ScheduleExecutor as CodeletSchedule,
 };
 use core::time::Duration;
 use eyre::Result;
 use nodo::prelude::RuntimeControl;
-use std::{collections::HashMap, sync::mpsc::RecvTimeoutError};
+use std::sync::mpsc::RecvTimeoutError;
 
 pub struct Runtime {
     tx_control: std::sync::mpsc::SyncSender<RuntimeControl>,
@@ -55,7 +55,7 @@ impl Runtime {
     }
 
     pub fn spin(&mut self) {
-        let sleep_duration = Duration::from_millis(100);
+        let sleep_duration = Duration::from_millis(250);
 
         loop {
             match self.rx_control.recv_timeout(sleep_duration) {
