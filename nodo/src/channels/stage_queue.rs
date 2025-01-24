@@ -191,7 +191,7 @@ impl<T> BackStage<T> {
                             ..Default::default()
                         };
 
-                        self.items.append(&mut target.items);
+                        target.items.append(&mut self.items);
 
                         result
                     }
