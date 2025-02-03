@@ -71,6 +71,7 @@ impl Publisher {
             NngPubConfig {
                 address: address.to_string(),
                 queue_size: 24,
+                enable_statistics: false,
             },
         );
         join.tx.connect(&mut nng_pub.rx).unwrap(); // SAFETY errors guaranteed to not happen
@@ -174,6 +175,7 @@ mod tests {
             NngPubConfig {
                 address: ADDRESS.to_string(),
                 queue_size: 10,
+                enable_statistics: false,
             },
         );
 

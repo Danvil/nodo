@@ -5,23 +5,95 @@ use log::{error, info, trace};
 use nng::{Protocol, Socket};
 use nodo::prelude::*;
 use nodo_core::{Topic, WithTopic};
+use std::{collections::HashMap, time::Instant};
 
 /// Codelet which receives serialized messages and writes them to MCAP
 pub struct NngPub {
     socket: Option<Socket>,
-    message_count: usize,
+    statistics: Option<Statistics>,
 }
 
 pub struct NngPubConfig {
     pub address: String,
     pub queue_size: usize,
+    pub enable_statistics: bool,
+}
+
+#[derive(Default)]
+pub struct Statistics {
+    items: HashMap<String, TopicStatistics>,
+    last_sec: Option<Instant>,
+}
+
+impl Statistics {
+    pub fn add(&mut self, topic: &str, size: usize) {
+        if let Some(item) = self.items.get_mut(topic) {
+            item.add(size);
+        } else {
+            let mut item = TopicStatistics::default();
+            item.add(size);
+            self.items.insert(topic.into(), item);
+        }
+    }
+
+    pub fn step(&mut self) {
+        let now = Instant::now();
+        if self.last_sec.is_none() {
+            self.last_sec = Some(now);
+        }
+        let delta = (now - self.last_sec.unwrap()).as_secs_f64();
+        if delta >= 1.0 {
+            for (_, item) in self.items.iter_mut() {
+                item.reset_sec();
+            }
+            self.last_sec = Some(now);
+            self.print_report();
+        }
+    }
+
+    pub fn print_report(&self) {
+        println!("NngPub statistics:");
+        for (topic, item) in self.items.iter() {
+            println!(
+                "  [{topic}] {} Hz | {:.1} kB/s",
+                item.last_sec_count,
+                item.last_sec_size as f64 / 1024.
+            );
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct TopicStatistics {
+    total_size: usize,
+    total_count: usize,
+    current_sec_size: usize,
+    current_sec_count: usize,
+    last_sec_size: usize,
+    last_sec_count: usize,
+}
+
+impl TopicStatistics {
+    pub fn add(&mut self, size: usize) {
+        self.total_size += size;
+        self.total_count += 1;
+        self.current_sec_size += size;
+        self.current_sec_count += 1;
+    }
+
+    pub fn reset_sec(&mut self) {
+        self.last_sec_size = self.current_sec_size;
+        self.last_sec_count = self.current_sec_count;
+        self.current_sec_size = 0;
+        self.current_sec_count = 0;
+    }
 }
 
 impl Default for NngPub {
     fn default() -> Self {
         Self {
             socket: None,
-            message_count: 0,
+            statistics: None,
         }
     }
 }
@@ -58,6 +130,10 @@ impl Codelet for NngPub {
         }
 
         self.socket = Some(socket);
+
+        if cx.config.enable_statistics {
+            self.statistics = Some(Statistics::default());
+        }
 
         SUCCESS
     }
@@ -96,9 +172,16 @@ impl Codelet for NngPub {
             socket.send(outmsg).map_err(|(_, err)| err)?;
 
             count += 1;
+
+            if let Some(stats) = self.statistics.as_mut() {
+                let topic_str: String = (&message.value.topic).into();
+                stats.add(&topic_str, outmsg_size);
+            }
         }
 
-        self.message_count += count;
+        if let Some(stats) = self.statistics.as_mut() {
+            stats.step();
+        }
 
         if count > 0 {
             SUCCESS
