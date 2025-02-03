@@ -42,10 +42,10 @@ pub trait BinaryFormat<T> {
     fn schema(&self) -> Schema;
 
     /// Serialize data into bytes
-    fn serialize(&self, data: &T) -> EyreResult<Vec<u8>>;
+    fn serialize(&mut self, data: &T) -> EyreResult<Vec<u8>>;
 
     /// Deserialize data from bytes
-    fn deserialize(&self, buffer: Vec<u8>) -> EyreResult<T>;
+    fn deserialize(&mut self, buffer: &[u8]) -> EyreResult<T>;
 }
 
 /// Schema definition used to describe the data type of a serialized message

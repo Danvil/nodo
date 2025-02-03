@@ -1,16 +1,21 @@
-use core::{marker::PhantomData, time::Duration};
+use crate::bincode_format::Bincode;
+use core::time::Duration;
 use nodo::{
     codelet::{CodeletInstance, ScheduleBuilder},
     prelude::*,
 };
-use nodo_core::{BinaryFormat, EyreResult, Schema};
+use nodo_core::EyreResult;
 use nodo_std::{Serializer, SerializerConfig, TopicJoin, TopicJoinConfig};
 use serde::{Deserialize, Serialize};
 
+mod bincode_format;
 mod r#pub;
+mod snappy_bincode_format;
 mod sub;
 
+pub use bincode_format::*;
 pub use r#pub::*;
+pub use snappy_bincode_format::*;
 pub use sub::*;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -25,34 +30,6 @@ impl NngPubSubHeader {
     pub const MAGIC: u64 = 0x90D0ABCDABCD90D0;
     pub const CRC: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_AUTOSAR);
     pub const BINCODE_SIZE: usize = 44;
-}
-
-pub struct Bincode<T>(PhantomData<T>);
-
-impl<T> Default for Bincode<T> {
-    fn default() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<T> BinaryFormat<T> for Bincode<T>
-where
-    T: Serialize + for<'a> Deserialize<'a>,
-{
-    fn schema(&self) -> Schema {
-        Schema {
-            name: core::any::type_name::<T>().to_string(),
-            encoding: String::from("bincode"),
-        }
-    }
-
-    fn serialize(&self, data: &T) -> EyreResult<Vec<u8>> {
-        Ok(bincode::serialize(data)?)
-    }
-
-    fn deserialize(&self, buffer: Vec<u8>) -> EyreResult<T> {
-        Ok(bincode::deserialize(&buffer)?)
-    }
 }
 
 /// Helper to simplify publishing serialized messages from multiple channels on the same socket

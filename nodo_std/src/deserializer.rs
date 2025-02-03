@@ -61,7 +61,7 @@ where
                         acqtime: message.stamp.acqtime,
                         pubtime: cx.clocks.app_mono.now(),
                     },
-                    value: self.format.deserialize(message.value)?,
+                    value: self.format.deserialize(&message.value)?,
                 })?;
             }
             SUCCESS

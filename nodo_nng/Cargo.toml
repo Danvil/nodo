@@ -6,12 +6,14 @@ edition = "2021"
 [dependencies]
 bincode = { workspace = true }
 crc = "3.2.1"
+eyre = { workspace = true }
 log = "0.4"
 nng = { workspace = true }
 nodo = { path = "../nodo"}
 nodo_core = { path = "../nodo_core"}
 nodo_std = { path = "../nodo_std"}
 serde = { version = "1.0", features = ["derive"] }
+snap = { workspace = true }
 
 [dev-dependencies]
 env_logger = "0.10"
